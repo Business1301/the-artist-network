@@ -118,7 +118,7 @@ function SignUpForm() {
   // If email verification screen is active
   if (emailConfirmationRequired) {
     return (
-      <div className="max-w-md w-full mx-auto bg-white rounded-3xl border border-gray-200/90 shadow-xl p-8 sm:p-10 text-center">
+      <div className="max-w-md w-full mx-auto bg-white rounded-2xl border border-gray-200 shadow-sm p-8 sm:p-10 text-center">
         <div className="w-16 h-16 rounded-2xl bg-purple-50 text-purple-600 text-3xl font-bold flex items-center justify-center mx-auto mb-4">
           ✉️
         </div>
@@ -133,7 +133,7 @@ function SignUpForm() {
         </div>
         <Link
           href="/login"
-          className="inline-block w-full py-3 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md transition-all text-center"
+          className="inline-block w-full py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold text-xs shadow-md shadow-purple-600/20 transition-all text-center"
         >
           Return to Login
         </Link>
@@ -144,39 +144,31 @@ function SignUpForm() {
   return (
     <div className="max-w-lg w-full mx-auto">
 
-      {/* Supabase Status Banner */}
-      <div
-        className={`mb-6 p-4 rounded-2xl border text-xs leading-relaxed shadow-sm ${
-          configured
-            ? "bg-emerald-50 border-emerald-200 text-emerald-900"
-            : "bg-amber-50 border-amber-200 text-amber-900"
-        }`}
-      >
-        <div className="flex items-start gap-2.5">
-          <span className="text-base flex-shrink-0" aria-hidden="true">
-            {configured ? "🟢" : "⚙️"}
-          </span>
-          <div>
-            <strong className="block font-semibold mb-0.5">
-              {configured ? "Supabase Connected" : "Supabase Setup Pending:"}
-            </strong>
-            {configured ? (
-              <span>Live registration is active against your Supabase backend.</span>
-            ) : (
+      {/* Supabase Status Banner (Only shown if setup is missing) */}
+      {!configured && (
+        <div className="mb-6 p-4 rounded-2xl border bg-amber-50 border-amber-200 text-amber-900 text-xs leading-relaxed shadow-sm">
+          <div className="flex items-start gap-2.5">
+            <span className="text-base flex-shrink-0" aria-hidden="true">
+              ⚙️
+            </span>
+            <div>
+              <strong className="block font-semibold mb-0.5">
+                Supabase Setup Pending:
+              </strong>
               <span>
                 Add your real project URL and anon key to <code>.env.local</code> to activate live account creation. Form validation and UI remain fully functional.
               </span>
-            )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Main Registration Card */}
-      <div className="bg-white rounded-3xl border border-gray-200/90 shadow-xl p-8 sm:p-10">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 sm:p-10">
 
         {/* Card Header */}
         <div className="text-center mb-8">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-500 text-white font-bold text-sm flex items-center justify-center mx-auto mb-3 shadow-md">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-600 to-pink-500 text-white font-extrabold text-base flex items-center justify-center mx-auto mb-3 shadow-md">
             TAN
           </div>
           <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">
@@ -188,7 +180,7 @@ function SignUpForm() {
         </div>
 
         {/* Role Selector Tabs */}
-        <div className="grid grid-cols-2 gap-2 p-1.5 bg-gray-100 rounded-2xl mb-8">
+        <div className="grid grid-cols-2 gap-2 p-1.5 bg-gray-50 border border-gray-200 rounded-2xl mb-8">
           <button
             type="button"
             onClick={() => {
@@ -198,8 +190,8 @@ function SignUpForm() {
             }}
             className={`py-3 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 ${
               role === "artist"
-                ? "bg-white text-purple-700 shadow-md"
-                : "text-gray-600 hover:text-gray-900"
+                ? "bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs"
+                : "bg-white text-gray-600 hover:text-gray-900 border border-gray-200/80"
             }`}
           >
             <span>🎨</span>
@@ -215,8 +207,8 @@ function SignUpForm() {
             }}
             className={`py-3 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 ${
               role === "business"
-                ? "bg-white text-purple-700 shadow-md"
-                : "text-gray-600 hover:text-gray-900"
+                ? "bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs"
+                : "bg-white text-gray-600 hover:text-gray-900 border border-gray-200/80"
             }`}
           >
             <span>🏢</span>
@@ -225,7 +217,7 @@ function SignUpForm() {
         </div>
 
         {/* Role Description Sub-banner */}
-        <div className="mb-6 p-3 rounded-xl bg-gray-50 border border-gray-100 text-xs text-gray-600 text-center">
+        <div className="mb-6 p-3 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-600 text-center">
           {role === "artist" ? (
             <span>Creating an <strong>Artist Profile</strong> to showcase your work and receive booking enquiries.</span>
           ) : (
@@ -239,7 +231,7 @@ function SignUpForm() {
             role="status"
             className={`mb-6 p-3.5 rounded-2xl border text-xs leading-relaxed ${
               notice.error
-                ? "bg-red-50 border-red-200 text-red-900"
+                ? "bg-rose-50 border-rose-200 text-rose-900"
                 : "bg-emerald-50 border-emerald-200 text-emerald-900"
             }`}
           >
@@ -256,7 +248,7 @@ function SignUpForm() {
           {/* Artist: Full Name */}
           {role === "artist" && (
             <div>
-              <label htmlFor="full-name" className="block text-xs font-semibold text-gray-700 mb-1">
+              <label htmlFor="full-name" className="block text-xs font-bold text-gray-700 mb-1.5">
                 Full Name
               </label>
               <input
@@ -271,12 +263,14 @@ function SignUpForm() {
                 placeholder="e.g. Arjun Sharma"
                 aria-invalid={!!errors.fullName}
                 aria-describedby={errors.fullName ? "full-name-error" : undefined}
-                className={`w-full px-3.5 py-2.5 rounded-xl border text-sm text-gray-900 bg-gray-50/50 outline-none transition-all ${
-                  errors.fullName ? "border-red-400 bg-red-50/30" : "border-gray-200 focus:bg-white focus:border-purple-600"
+                className={`w-full px-3.5 py-2.5 rounded-xl border text-sm text-gray-900 bg-white outline-none transition-all ${
+                  errors.fullName
+                    ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
+                    : "border-gray-300 focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
                 }`}
               />
               {errors.fullName && (
-                <p id="full-name-error" role="alert" className="text-red-600 text-xs mt-1 font-medium">
+                <p id="full-name-error" role="alert" className="text-rose-600 text-xs mt-1 font-semibold">
                   {errors.fullName}
                 </p>
               )}
@@ -286,7 +280,7 @@ function SignUpForm() {
           {/* Business: Contact Person's Name */}
           {role === "business" && (
             <div>
-              <label htmlFor="contact-name" className="block text-xs font-semibold text-gray-700 mb-1">
+              <label htmlFor="contact-name" className="block text-xs font-bold text-gray-700 mb-1.5">
                 Contact Person&apos;s Name
               </label>
               <input
@@ -301,12 +295,14 @@ function SignUpForm() {
                 placeholder="e.g. Rishi Kapoor"
                 aria-invalid={!!errors.contactName}
                 aria-describedby={errors.contactName ? "contact-name-error" : undefined}
-                className={`w-full px-3.5 py-2.5 rounded-xl border text-sm text-gray-900 bg-gray-50/50 outline-none transition-all ${
-                  errors.contactName ? "border-red-400 bg-red-50/30" : "border-gray-200 focus:bg-white focus:border-purple-600"
+                className={`w-full px-3.5 py-2.5 rounded-xl border text-sm text-gray-900 bg-white outline-none transition-all ${
+                  errors.contactName
+                    ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
+                    : "border-gray-300 focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
                 }`}
               />
               {errors.contactName && (
-                <p id="contact-name-error" role="alert" className="text-red-600 text-xs mt-1 font-medium">
+                <p id="contact-name-error" role="alert" className="text-rose-600 text-xs mt-1 font-semibold">
                   {errors.contactName}
                 </p>
               )}
@@ -316,7 +312,7 @@ function SignUpForm() {
           {/* Business: Organization Name */}
           {role === "business" && (
             <div>
-              <label htmlFor="business-name" className="block text-xs font-semibold text-gray-700 mb-1">
+              <label htmlFor="business-name" className="block text-xs font-bold text-gray-700 mb-1.5">
                 Business, Venue, or Organization Name
               </label>
               <input
@@ -331,12 +327,14 @@ function SignUpForm() {
                 placeholder="e.g. The Olive Courtyard or TechNova Events"
                 aria-invalid={!!errors.businessName}
                 aria-describedby={errors.businessName ? "business-name-error" : undefined}
-                className={`w-full px-3.5 py-2.5 rounded-xl border text-sm text-gray-900 bg-gray-50/50 outline-none transition-all ${
-                  errors.businessName ? "border-red-400 bg-red-50/30" : "border-gray-200 focus:bg-white focus:border-purple-600"
+                className={`w-full px-3.5 py-2.5 rounded-xl border text-sm text-gray-900 bg-white outline-none transition-all ${
+                  errors.businessName
+                    ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
+                    : "border-gray-300 focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
                 }`}
               />
               {errors.businessName && (
-                <p id="business-name-error" role="alert" className="text-red-600 text-xs mt-1 font-medium">
+                <p id="business-name-error" role="alert" className="text-rose-600 text-xs mt-1 font-semibold">
                   {errors.businessName}
                 </p>
               )}
@@ -345,7 +343,7 @@ function SignUpForm() {
 
           {/* Email Address */}
           <div>
-            <label htmlFor="signup-email" className="block text-xs font-semibold text-gray-700 mb-1">
+            <label htmlFor="signup-email" className="block text-xs font-bold text-gray-700 mb-1.5">
               {role === "business" ? "Business Email Address" : "Email Address"}
             </label>
             <input
@@ -360,12 +358,14 @@ function SignUpForm() {
               placeholder="name@example.com"
               aria-invalid={!!errors.email}
               aria-describedby={errors.email ? "signup-email-error" : undefined}
-              className={`w-full px-3.5 py-2.5 rounded-xl border text-sm text-gray-900 bg-gray-50/50 outline-none transition-all ${
-                errors.email ? "border-red-400 bg-red-50/30" : "border-gray-200 focus:bg-white focus:border-purple-600"
+              className={`w-full px-3.5 py-2.5 rounded-xl border text-sm text-gray-900 bg-white outline-none transition-all ${
+                errors.email
+                  ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
+                  : "border-gray-300 focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
               }`}
             />
             {errors.email && (
-              <p id="signup-email-error" role="alert" className="text-red-600 text-xs mt-1 font-medium">
+              <p id="signup-email-error" role="alert" className="text-rose-600 text-xs mt-1 font-semibold">
                 {errors.email}
               </p>
             )}
@@ -373,7 +373,7 @@ function SignUpForm() {
 
           {/* Password */}
           <div>
-            <label htmlFor="signup-password" className="block text-xs font-semibold text-gray-700 mb-1">
+            <label htmlFor="signup-password" className="block text-xs font-bold text-gray-700 mb-1.5">
               Create Password <span className="font-normal text-gray-400">(min. 8 characters)</span>
             </label>
             <div className="relative">
@@ -389,15 +389,17 @@ function SignUpForm() {
                 placeholder="At least 8 characters"
                 aria-invalid={!!errors.password}
                 aria-describedby={errors.password ? "signup-password-error" : undefined}
-                className={`w-full px-3.5 py-2.5 pr-10 rounded-xl border text-sm text-gray-900 bg-gray-50/50 outline-none transition-all ${
-                  errors.password ? "border-red-400 bg-red-50/30" : "border-gray-200 focus:bg-white focus:border-purple-600"
+                className={`w-full px-3.5 py-2.5 pr-10 rounded-xl border text-sm text-gray-900 bg-white outline-none transition-all ${
+                  errors.password
+                    ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
+                    : "border-gray-300 focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
                 }`}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label={showPassword ? "Hide password" : "Show password"}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 p-1"
               >
                 {showPassword ? (
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -412,7 +414,7 @@ function SignUpForm() {
               </button>
             </div>
             {errors.password && (
-              <p id="signup-password-error" role="alert" className="text-red-600 text-xs mt-1 font-medium">
+              <p id="signup-password-error" role="alert" className="text-rose-600 text-xs mt-1 font-semibold">
                 {errors.password}
               </p>
             )}
@@ -420,7 +422,7 @@ function SignUpForm() {
 
           {/* Confirm Password */}
           <div>
-            <label htmlFor="confirm-password" className="block text-xs font-semibold text-gray-700 mb-1">
+            <label htmlFor="confirm-password" className="block text-xs font-bold text-gray-700 mb-1.5">
               Confirm Password
             </label>
             <div className="relative">
@@ -436,15 +438,17 @@ function SignUpForm() {
                 placeholder="Re-type your password"
                 aria-invalid={!!errors.confirmPassword}
                 aria-describedby={errors.confirmPassword ? "confirm-password-error" : undefined}
-                className={`w-full px-3.5 py-2.5 pr-10 rounded-xl border text-sm text-gray-900 bg-gray-50/50 outline-none transition-all ${
-                  errors.confirmPassword ? "border-red-400 bg-red-50/30" : "border-gray-200 focus:bg-white focus:border-purple-600"
+                className={`w-full px-3.5 py-2.5 pr-10 rounded-xl border text-sm text-gray-900 bg-white outline-none transition-all ${
+                  errors.confirmPassword
+                    ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
+                    : "border-gray-300 focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20"
                 }`}
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 aria-label={showConfirmPassword ? "Hide confirmed password" : "Show confirmed password"}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 p-1"
               >
                 {showConfirmPassword ? (
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -459,7 +463,7 @@ function SignUpForm() {
               </button>
             </div>
             {errors.confirmPassword && (
-              <p id="confirm-password-error" role="alert" className="text-red-600 text-xs mt-1 font-medium">
+              <p id="confirm-password-error" role="alert" className="text-rose-600 text-xs mt-1 font-semibold">
                 {errors.confirmPassword}
               </p>
             )}
@@ -493,7 +497,7 @@ function SignUpForm() {
               </label>
             </div>
             {errors.terms && (
-              <p id="terms-error" role="alert" className="text-red-600 text-xs mt-1 font-medium">
+              <p id="terms-error" role="alert" className="text-rose-600 text-xs mt-1 font-semibold">
                 {errors.terms}
               </p>
             )}
@@ -503,7 +507,7 @@ function SignUpForm() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white font-bold text-sm shadow-md shadow-purple-200 transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
+            className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold text-xs shadow-md shadow-purple-600/20 transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
           >
             {isSubmitting ? (
               <>

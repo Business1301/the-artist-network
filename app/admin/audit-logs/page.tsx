@@ -10,10 +10,10 @@ export default async function AuditLogsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
           Platform Moderation Audit Trail
         </h1>
-        <p className="text-xs sm:text-sm text-zinc-400 mt-1">
+        <p className="text-xs sm:text-sm text-gray-500 mt-1">
           Cryptographically immutable audit records logged atomically with each moderation decision.
         </p>
       </div>

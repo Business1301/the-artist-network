@@ -69,7 +69,7 @@ const PUBLIC_ARTIST_FIELDS = `
  */
 function withQueryTimeout<D>(
   query: PromiseLike<{ data: D | null; error: PostgrestError | null }>,
-  timeoutMs = 4000,
+  timeoutMs = 8000,
   label = "DB query"
 ): Promise<{ data: D | null; error: PostgrestError | null }> {
   const timeoutError: PostgrestError = {
@@ -200,7 +200,7 @@ export async function getPublishedArtists(
 
   const result = await withQueryTimeout<PublicArtistSummary[]>(
     query,
-    4000,
+    8000,
     "artist discovery"
   );
   const { data, error } = result;
@@ -255,7 +255,7 @@ export async function getPublishedCategoriesAndCities(): Promise<{
 
   const { data, error } = await withQueryTimeout<{ category: string | null; city: string | null }[]>(
     query,
-    4000,
+    8000,
     "category/city lookup"
   );
 

@@ -12,12 +12,12 @@ export default async function AdminLayout({
   const admin = await requireAdmin();
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans antialiased">
+    <div className="min-h-screen bg-gray-50 text-gray-900 flex flex-col font-sans antialiased">
       <AdminNavbar adminName={admin.fullName} adminEmail={admin.email} />
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}
       </main>
-      <footer className="border-t border-zinc-900 bg-zinc-950 py-6 text-center text-xs text-zinc-600">
+      <footer className="border-t border-gray-200 bg-white py-6 text-center text-xs text-gray-500">
         The Artist Network &bull; Platform Management &bull; Owner-Only Administration
       </footer>
     </div>

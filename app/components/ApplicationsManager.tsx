@@ -170,14 +170,14 @@ export default function ApplicationsManager({
   return (
     <div className="space-y-6">
       {/* Top Filter Tabs */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 pb-4">
-        <div className="flex items-center gap-2 bg-zinc-900 p-1 rounded-2xl border border-zinc-800">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 pb-4">
+        <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-200">
           <button
             onClick={() => setFilter("pending_review")}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
               filter === "pending_review"
-                ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs"
-                : "text-zinc-400 hover:text-white"
+                ? "bg-amber-50 text-amber-700 border border-amber-200 shadow-2xs font-bold"
+                : "text-gray-600 hover:text-gray-900"
             }`}
           >
             Pending Review ({applications.filter((a) => a.profile_status === "pending_review").length})
@@ -187,8 +187,8 @@ export default function ApplicationsManager({
             onClick={() => setFilter("published")}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
               filter === "published"
-                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-xs"
-                : "text-zinc-400 hover:text-white"
+                ? "bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs font-bold"
+                : "text-gray-600 hover:text-gray-900"
             }`}
           >
             Published ({applications.filter((a) => a.profile_status === "published").length})
@@ -198,8 +198,8 @@ export default function ApplicationsManager({
             onClick={() => setFilter("rejected")}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
               filter === "rejected"
-                ? "bg-red-500/20 text-red-300 border border-red-500/40 shadow-xs"
-                : "text-zinc-400 hover:text-white"
+                ? "bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs font-bold"
+                : "text-gray-600 hover:text-gray-900"
             }`}
           >
             Rejected ({applications.filter((a) => a.profile_status === "rejected").length})
@@ -209,35 +209,35 @@ export default function ApplicationsManager({
             onClick={() => setFilter("all")}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
               filter === "all"
-                ? "bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-xs"
-                : "text-zinc-400 hover:text-white"
+                ? "bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs font-bold"
+                : "text-gray-600 hover:text-gray-900"
             }`}
           >
             All ({applications.length})
           </button>
         </div>
 
-        <div className="text-xs text-zinc-400">
-          Showing <span className="font-bold text-white">{filteredApps.length}</span> application(s)
+        <div className="text-xs text-gray-500">
+          Showing <span className="font-bold text-gray-900">{filteredApps.length}</span> application(s)
         </div>
       </div>
 
       {/* Applications Table / Cards */}
       {filteredApps.length === 0 ? (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-12 text-center">
+        <div className="bg-white border border-gray-200 rounded-2xl p-12 text-center shadow-sm">
           <span className="text-4xl block mb-2">📋</span>
-          <h3 className="text-base font-bold text-zinc-200">No applications match this filter</h3>
-          <p className="text-xs text-zinc-500 mt-1">
+          <h3 className="text-base font-bold text-gray-900">No applications match this filter</h3>
+          <p className="text-xs text-gray-500 mt-1">
             {filter === "pending_review"
               ? "All submitted artist applications have been moderated."
               : `There are currently no artists with status '${filter}'.`}
           </p>
         </div>
       ) : (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-zinc-950/60 border-b border-zinc-800 text-zinc-400 font-semibold uppercase tracking-wider text-[10px]">
+              <thead className="bg-gray-50/80 border-b border-gray-200 text-gray-500 font-semibold uppercase tracking-wider text-[10px]">
                 <tr>
                   <th className="px-6 py-3.5">Artist</th>
                   <th className="px-4 py-3.5">Category</th>
@@ -248,32 +248,32 @@ export default function ApplicationsManager({
                   <th className="px-6 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/60 text-zinc-200">
+              <tbody className="divide-y divide-gray-100 text-gray-700">
                 {filteredApps.map((app) => {
                   const statusBadge =
                     app.profile_status === "published"
-                      ? "bg-emerald-950/80 text-emerald-400 border-emerald-800"
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                       : app.profile_status === "rejected"
-                      ? "bg-red-950/80 text-red-400 border-red-800"
-                      : "bg-amber-950/80 text-amber-400 border-amber-800";
+                      ? "bg-rose-50 text-rose-700 border-rose-200"
+                      : "bg-amber-50 text-amber-700 border-amber-200";
 
                   return (
-                    <tr key={app.id} className="hover:bg-zinc-800/40 transition-colors">
+                    <tr key={app.id} className="hover:bg-gray-50/80 transition-colors">
                       <td className="px-6 py-4 font-medium">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-purple-950/60 border border-purple-800/60 flex items-center justify-center text-sm font-bold text-purple-300">
+                          <div className="w-9 h-9 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-center text-sm font-bold text-purple-700">
                             {app.stage_name[0] || "?"}
                           </div>
                           <div>
-                            <div className="font-bold text-sm text-white flex items-center gap-1.5">
+                            <div className="font-bold text-sm text-gray-900 flex items-center gap-1.5">
                               <span>{app.stage_name}</span>
                               {app.is_verified && (
-                                <span className="text-purple-400 text-xs font-bold" title="Verified Artist">
+                                <span className="text-purple-600 text-xs font-bold" title="Verified Artist">
                                   ✓
                                 </span>
                               )}
                             </div>
-                            <div className="text-[11px] text-zinc-400 truncate max-w-[140px]">
+                            <div className="text-[11px] text-gray-400 truncate max-w-[140px]">
                               @{app.slug}
                             </div>
                           </div>
@@ -281,23 +281,23 @@ export default function ApplicationsManager({
                       </td>
 
                       <td className="px-4 py-4">
-                        <span className="px-2.5 py-1 rounded-md bg-zinc-800 text-zinc-300 text-[11px] font-medium capitalize">
+                        <span className="px-2.5 py-1 rounded-md bg-gray-100 text-gray-700 text-[11px] font-medium capitalize">
                           {app.category}
                         </span>
                       </td>
 
-                      <td className="px-4 py-4 text-zinc-300">
+                      <td className="px-4 py-4 text-gray-600">
                         📍 {app.city}{app.state ? `, ${app.state}` : ""}
                       </td>
 
-                      <td className="px-4 py-4 text-zinc-300">
+                      <td className="px-4 py-4 text-gray-800 font-semibold">
                         {app.starting_price ? (
                           <span>
                             ₹{Number(app.starting_price).toLocaleString("en-IN")}{" "}
-                            <span className="text-[10px] text-zinc-500">/{app.pricing_unit || "event"}</span>
+                            <span className="text-[10px] text-gray-500 font-normal">/{app.pricing_unit || "event"}</span>
                           </span>
                         ) : (
-                          <span className="text-zinc-500">Not set</span>
+                          <span className="text-gray-400 font-normal">Not set</span>
                         )}
                       </td>
 
@@ -307,7 +307,7 @@ export default function ApplicationsManager({
                         </span>
                       </td>
 
-                      <td className="px-4 py-4 text-zinc-400 text-[11px]">
+                      <td className="px-4 py-4 text-gray-500 text-[11px]">
                         {new Date(app.created_at).toLocaleDateString("en-IN", {
                           day: "numeric",
                           month: "short",
@@ -334,26 +334,26 @@ export default function ApplicationsManager({
 
       {/* Review Modal */}
       {selectedApp && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
             {/* Modal Header */}
-            <div className="px-6 py-5 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/60">
+            <div className="px-6 py-5 border-b border-gray-200 flex items-center justify-between bg-gray-50/60">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-purple-950/60 border border-purple-800/60 flex items-center justify-center text-base font-bold text-purple-300">
+                <div className="w-10 h-10 rounded-2xl bg-purple-50 border border-purple-200 flex items-center justify-center text-base font-bold text-purple-700">
                   {selectedApp.stage_name[0] || "?"}
                 </div>
                 <div>
-                  <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                  <h3 className="text-base font-extrabold text-gray-900 flex items-center gap-2">
                     <span>{selectedApp.stage_name}</span>
-                    <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider bg-zinc-800 text-zinc-300">
+                    <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider bg-gray-100 text-gray-700">
                       {selectedApp.category}
                     </span>
                     {selectedApp.is_verified && (
-                      <span className="text-purple-400 text-xs font-bold">✓ Verified</span>
+                      <span className="text-purple-600 text-xs font-bold">✓ Verified</span>
                     )}
                   </h3>
-                  <p className="text-xs text-zinc-400">
-                    ID: <code className="text-zinc-300">{selectedApp.id}</code> &bull; Submitted{" "}
+                  <p className="text-xs text-gray-500">
+                    ID: <code className="text-gray-700">{selectedApp.id}</code> &bull; Submitted{" "}
                     {new Date(selectedApp.created_at).toLocaleDateString("en-IN")}
                   </p>
                 </div>
@@ -361,7 +361,7 @@ export default function ApplicationsManager({
 
               <button
                 onClick={() => setSelectedApp(null)}
-                className="w-8 h-8 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center text-sm font-bold transition-colors"
+                className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 flex items-center justify-center text-sm font-bold transition-colors"
                 aria-label="Close modal"
               >
                 ✕
@@ -369,14 +369,14 @@ export default function ApplicationsManager({
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 overflow-y-auto flex-1 space-y-6 text-xs text-zinc-300">
+            <div className="p-6 overflow-y-auto flex-1 space-y-6 text-xs text-gray-700">
               {/* Notice */}
               {actionNotice && (
                 <div
                   className={`p-3.5 rounded-2xl text-xs border leading-relaxed ${
                     actionNotice.error
-                      ? "bg-red-950/60 border-red-800 text-red-300"
-                      : "bg-emerald-950/60 border-emerald-800 text-emerald-300"
+                      ? "bg-rose-50 border-rose-200 text-rose-900"
+                      : "bg-emerald-50 border-emerald-200 text-emerald-900"
                   }`}
                 >
                   {actionNotice.message}
@@ -384,21 +384,21 @@ export default function ApplicationsManager({
               )}
 
               {/* Status Banner */}
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-zinc-950/60 border border-zinc-800">
+              <div className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 border border-gray-200">
                 <div>
-                  <span className="text-zinc-500 block text-[10px] uppercase tracking-wider font-semibold">
+                  <span className="text-gray-500 block text-[10px] uppercase tracking-wider font-semibold">
                     Current Moderation Status
                   </span>
-                  <span className="font-bold text-sm text-white capitalize">
+                  <span className="font-bold text-sm text-gray-900 capitalize">
                     {selectedApp.profile_status.replace("_", " ")}
                   </span>
                 </div>
                 {selectedApp.rejection_reason && (
                   <div className="text-right max-w-sm">
-                    <span className="text-red-400 block text-[10px] uppercase tracking-wider font-semibold">
+                    <span className="text-rose-600 block text-[10px] uppercase tracking-wider font-semibold">
                       Reason
                     </span>
-                    <span className="text-zinc-300 text-xs italic">
+                    <span className="text-gray-700 text-xs italic">
                       &quot;{selectedApp.rejection_reason}&quot;
                     </span>
                   </div>
@@ -407,19 +407,19 @@ export default function ApplicationsManager({
 
               {/* Basic Details */}
               <div>
-                <h4 className="font-bold text-sm text-white mb-2">Profile Overview</h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 rounded-2xl bg-zinc-950/40 border border-zinc-800/80">
+                <h4 className="font-bold text-sm text-gray-900 mb-2">Profile Overview</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 rounded-2xl bg-gray-50/60 border border-gray-200">
                   <div>
-                    <span className="text-zinc-500 block text-[10px] font-semibold uppercase">Location</span>
-                    <span className="text-zinc-200 font-medium">📍 {selectedApp.city}{selectedApp.state ? `, ${selectedApp.state}` : ""}</span>
+                    <span className="text-gray-500 block text-[10px] font-semibold uppercase">Location</span>
+                    <span className="text-gray-900 font-medium">📍 {selectedApp.city}{selectedApp.state ? `, ${selectedApp.state}` : ""}</span>
                   </div>
                   <div>
-                    <span className="text-zinc-500 block text-[10px] font-semibold uppercase">Experience</span>
-                    <span className="text-zinc-200 font-medium">{selectedApp.experience_years} years</span>
+                    <span className="text-gray-500 block text-[10px] font-semibold uppercase">Experience</span>
+                    <span className="text-gray-900 font-medium">{selectedApp.experience_years} years</span>
                   </div>
                   <div>
-                    <span className="text-zinc-500 block text-[10px] font-semibold uppercase">Starting Fee</span>
-                    <span className="text-zinc-200 font-medium">
+                    <span className="text-gray-500 block text-[10px] font-semibold uppercase">Starting Fee</span>
+                    <span className="text-gray-900 font-medium">
                       {selectedApp.starting_price
                         ? `₹${Number(selectedApp.starting_price).toLocaleString("en-IN")} / ${selectedApp.pricing_unit || "event"}`
                         : "Not specified"}
@@ -430,19 +430,19 @@ export default function ApplicationsManager({
 
               {/* Bio */}
               <div>
-                <h4 className="font-bold text-sm text-white mb-1.5">Biography</h4>
-                <div className="p-4 rounded-2xl bg-zinc-950/40 border border-zinc-800/80 leading-relaxed text-zinc-300 whitespace-pre-wrap">
-                  {selectedApp.bio || <span className="text-zinc-500 italic">No biography provided.</span>}
+                <h4 className="font-bold text-sm text-gray-900 mb-1.5">Biography</h4>
+                <div className="p-4 rounded-2xl bg-gray-50/60 border border-gray-200 leading-relaxed text-gray-700 whitespace-pre-wrap">
+                  {selectedApp.bio || <span className="text-gray-400 italic">No biography provided.</span>}
                 </div>
               </div>
 
               {/* Genres / Specialities */}
               {selectedApp.genres && selectedApp.genres.length > 0 && (
                 <div>
-                  <h4 className="font-bold text-sm text-white mb-1.5">Genres & Styles</h4>
+                  <h4 className="font-bold text-sm text-gray-900 mb-1.5">Genres & Styles</h4>
                   <div className="flex flex-wrap gap-1.5">
                     {selectedApp.genres.map((g) => (
-                      <span key={g} className="px-2.5 py-1 rounded-lg bg-zinc-800 text-zinc-300 text-[11px] font-medium">
+                      <span key={g} className="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-700 text-[11px] font-medium border border-gray-200">
                         {g}
                       </span>
                     ))}
@@ -452,13 +452,13 @@ export default function ApplicationsManager({
 
               {/* Portfolio Items */}
               <div>
-                <h4 className="font-bold text-sm text-white mb-2">
+                <h4 className="font-bold text-sm text-gray-900 mb-2">
                   Portfolio Items ({selectedApp.portfolio_items?.length || 0})
                 </h4>
                 {isLoadingDetails ? (
-                  <div className="p-6 text-center text-zinc-500">Loading portfolio media...</div>
+                  <div className="p-6 text-center text-gray-400">Loading portfolio media...</div>
                 ) : !selectedApp.portfolio_items || selectedApp.portfolio_items.length === 0 ? (
-                  <div className="p-4 rounded-2xl bg-zinc-950/40 border border-zinc-800/80 text-zinc-500 italic">
+                  <div className="p-4 rounded-2xl bg-gray-50 border border-gray-200 text-gray-500 italic">
                     No portfolio media items uploaded yet.
                   </div>
                 ) : (
@@ -466,10 +466,10 @@ export default function ApplicationsManager({
                     {selectedApp.portfolio_items.map((item) => (
                       <div
                         key={item.id}
-                        className="p-3 rounded-2xl bg-zinc-950/60 border border-zinc-800/80 flex items-start gap-3"
+                        className="p-3 rounded-2xl bg-gray-50 border border-gray-200 flex items-start gap-3"
                       >
                         {item.thumbnail_url || (item.media_type === "image" && item.media_url) ? (
-                          <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-zinc-800">
+                          <div className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 bg-gray-100 border border-gray-200">
                             <Image
                               src={item.thumbnail_url || item.media_url}
                               alt={item.title}
@@ -479,20 +479,20 @@ export default function ApplicationsManager({
                             />
                           </div>
                         ) : (
-                          <div className="w-16 h-16 rounded-xl bg-zinc-800 shrink-0 flex items-center justify-center text-lg">
+                          <div className="w-16 h-16 rounded-xl bg-gray-100 border border-gray-200 shrink-0 flex items-center justify-center text-lg">
                             {item.media_type === "youtube" ? "🎬" : item.media_type === "audio" ? "🎵" : "📎"}
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
-                          <span className="font-bold text-zinc-200 block truncate">{item.title}</span>
-                          <span className="text-[10px] text-zinc-500 uppercase tracking-wider block">
+                          <span className="font-bold text-gray-900 block truncate">{item.title}</span>
+                          <span className="text-[10px] text-gray-500 uppercase tracking-wider block">
                             {item.media_type}
                           </span>
                           <a
                             href={item.media_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-[11px] text-purple-400 hover:text-purple-300 truncate block mt-1 underline"
+                            className="text-[11px] text-purple-600 hover:text-purple-800 truncate block mt-1 underline font-semibold"
                           >
                             Open Media &rarr;
                           </a>
@@ -505,9 +505,9 @@ export default function ApplicationsManager({
 
               {/* Reject Reason Form (if toggled) */}
               {showRejectModal && (
-                <div className="p-4 rounded-2xl bg-red-950/40 border border-red-800/80 space-y-3">
-                  <h4 className="font-bold text-sm text-red-300">Mandatory Rejection Reason</h4>
-                  <p className="text-zinc-400 text-[11px]">
+                <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 space-y-3">
+                  <h4 className="font-bold text-sm text-rose-800">Mandatory Rejection Reason</h4>
+                  <p className="text-gray-600 text-[11px]">
                     Explain clearly to the artist what needs to be improved or completed before resubmitting.
                   </p>
                   <textarea
@@ -515,13 +515,13 @@ export default function ApplicationsManager({
                     onChange={(e) => setRejectionReason(e.target.value)}
                     placeholder="e.g. Please provide at least two portfolio audio samples and a clearer stage photo."
                     rows={3}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-red-800/60 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-red-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-rose-300 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-rose-500"
                   />
                   <div className="flex justify-end gap-2">
                     <button
                       type="button"
                       onClick={() => setShowRejectModal(false)}
-                      className="px-3 py-1.5 rounded-xl border border-zinc-700 text-xs font-semibold text-zinc-300 hover:bg-zinc-800"
+                      className="px-3 py-1.5 rounded-xl border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-gray-100"
                     >
                       Cancel
                     </button>
@@ -529,7 +529,7 @@ export default function ApplicationsManager({
                       type="button"
                       onClick={handleReject}
                       disabled={isProcessing}
-                      className="px-4 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-xs disabled:opacity-50"
+                      className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs disabled:opacity-50"
                     >
                       {isProcessing ? "Rejecting..." : "Confirm Rejection"}
                     </button>
@@ -539,7 +539,7 @@ export default function ApplicationsManager({
             </div>
 
             {/* Modal Footer Controls */}
-            <div className="px-6 py-4 border-t border-zinc-800 bg-zinc-950/80 flex flex-wrap items-center justify-between gap-3">
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50/80 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 {/* Verification Actions (only for published artists) */}
                 {selectedApp.profile_status === "published" && (
@@ -548,7 +548,7 @@ export default function ApplicationsManager({
                       <button
                         onClick={handleVerify}
                         disabled={isProcessing}
-                        className="px-4 py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/40 text-purple-300 border border-purple-500/40 font-semibold text-xs transition-colors disabled:opacity-50"
+                        className="px-4 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-semibold text-xs transition-colors disabled:opacity-50 shadow-2xs"
                       >
                         {isProcessing ? "Processing..." : "✓ Grant Verification Badge"}
                       </button>
@@ -556,7 +556,7 @@ export default function ApplicationsManager({
                       <button
                         onClick={handleUnverify}
                         disabled={isProcessing}
-                        className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-semibold text-xs transition-colors disabled:opacity-50"
+                        className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 font-semibold text-xs transition-colors disabled:opacity-50"
                       >
                         {isProcessing ? "Processing..." : "Revoke Verification Badge"}
                       </button>
@@ -571,7 +571,7 @@ export default function ApplicationsManager({
                   <button
                     onClick={() => setShowRejectModal(true)}
                     disabled={isProcessing || showRejectModal}
-                    className="px-4 py-2 rounded-xl bg-red-950/60 hover:bg-red-900/80 text-red-300 border border-red-800/60 font-semibold text-xs transition-colors disabled:opacity-50"
+                    className="px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-xs transition-colors disabled:opacity-50"
                   >
                     Reject Application
                   </button>
@@ -581,7 +581,7 @@ export default function ApplicationsManager({
                   <button
                     onClick={handleApprove}
                     disabled={isProcessing}
-                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors shadow-md shadow-emerald-950/40 disabled:opacity-50"
+                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors shadow-sm disabled:opacity-50"
                   >
                     {isProcessing ? "Approving..." : "Approve & Publish"}
                   </button>
@@ -590,7 +590,7 @@ export default function ApplicationsManager({
                 <button
                   type="button"
                   onClick={() => setSelectedApp(null)}
-                  className="px-4 py-2 rounded-xl border border-zinc-800 hover:bg-zinc-800 text-zinc-400 hover:text-white font-medium text-xs transition-colors"
+                  className="px-4 py-2 rounded-xl border border-gray-300 hover:bg-gray-100 text-gray-700 font-medium text-xs transition-colors"
                 >
                   Close
                 </button>
