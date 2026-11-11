@@ -656,8 +656,25 @@ All integration checks executed with 100% pass rate:
    - Public showcase (`/artists/[slug]`) dynamically displays custom requirements or collapses if empty.
    - Graceful fallback in `app/actions/artist.ts` if database column migration is pending in remote DB.
 
-### 12.5 Next Steps & Phase Boundaries
+### 12.5 Artist Profile Editor & Portfolio Manager UI Harmonization
 
-- **Phase 4.5 Stage 3:** Complete. Test accounts are ready and verified.
+- **Objective:** Eliminate dark-mode visual disconnect between `/dashboard/artist` (clean light theme with purple accents) and `/dashboard/artist/edit` (previously dark `bg-gray-950`).
+- **Files Harmonized:**
+  - `app/dashboard/artist/edit/page.tsx`: Transformed to light canvas (`bg-gray-50 text-gray-900 pt-20 pb-20`).
+  - `app/components/PortfolioManager.tsx`: Transformed to clean white card (`bg-white rounded-2xl border border-gray-200 shadow-sm`), light drawer form, and white media cards.
+- **Components Standardized:**
+  1. **Account Bar:** Added top status indicator: `Authenticated as {userEmail} (Artist Account)` with a back link to dashboard.
+  2. **Profile Header & Completeness Card:** Mirrored dashboard's stage name, avatar box with gradient fallback, verification badges, public slug pill, action links, and progress bar (`from-purple-500 to-pink-500`).
+  3. **Section Cards (1–6):** Converted to `bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm` with numbered purple badges (`bg-purple-50 text-purple-700 border border-purple-200`).
+  4. **Form Controls:** Clean white inputs, selects, and textareas (`bg-white border border-gray-300 text-gray-900 placeholder-gray-400 focus:border-purple-600 focus:ring-2 focus:ring-purple-600/20`).
+  5. **Tags & Pills:** Light gray unselected state (`bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-200`) and solid active states.
+  6. **Technical Rider (Section 5):** Light item cards (`bg-gray-50 border border-gray-200 hover:border-gray-300`) with purple bullets and `✕` remove buttons.
+  7. **Sticky Action Bar:** White frosted glass bar (`bg-white/95 backdrop-blur-md border border-gray-200/90 rounded-2xl shadow-xl`) with `Save Draft` and gradient `Submit for Review →` button.
+- **Verification:** TypeScript: 0 errors, ESLint: 0 errors, Production build: 16/16 routes compiled cleanly. Git commit `623e8e5`.
+
+### 12.6 Next Steps & Phase Boundaries
+
+- **Phase 4.5 Stage 3:** Complete. Test accounts are ready, verified, and UI is fully synchronized.
 - **Phase 5:** NOT STARTED (Strict rule: Phase 5 remains blocked until explicit user sign-off).
+
 
