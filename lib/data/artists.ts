@@ -209,7 +209,7 @@ export async function getPublishedArtists(
   const count = (result as { count?: number | null }).count ?? null;
 
   if (error) {
-    console.error("Error fetching published artists:", error.message);
+    console.warn("Notice: Unable to fetch published artists (falling back to empty roster):", error.message);
     return {
       artists: [],
       totalCount: 0,
