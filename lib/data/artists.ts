@@ -1,4 +1,5 @@
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import type { PostgrestError } from "@supabase/supabase-js";
 
 export interface PublicArtistSummary {
   id: string;
@@ -60,13 +61,37 @@ const PUBLIC_ARTIST_FIELDS = `
   is_verified
 `;
 
-async function withTimeout<T>(promise: PromiseLike<T>, timeoutMs = 4000, fallback: T): Promise<T> {
+/**
+ * Race a Postgrest query against a timeout.
+ * On timeout, returns a typed error result instead of a silent fallback,
+ * so callers that check `error` will correctly treat a timeout as a failure —
+ * not as a genuine empty result-set.
+ */
+function withQueryTimeout<D>(
+  query: PromiseLike<{ data: D | null; error: PostgrestError | null }>,
+  timeoutMs = 4000,
+  label = "DB query"
+): Promise<{ data: D | null; error: PostgrestError | null }> {
+  const timeoutError: PostgrestError = {
+    message: `${label} timed out after ${timeoutMs}ms`,
+    details: "",
+    hint: "",
+    code: "TIMEOUT",
+    name: "PostgrestError",
+    toJSON() {
+      return { name: this.name, message: this.message, details: this.details, hint: this.hint, code: this.code };
+    },
+  };
+
   let timer: NodeJS.Timeout;
-  const timeoutPromise = new Promise<T>((resolve) => {
-    timer = setTimeout(() => resolve(fallback), timeoutMs);
-  });
+  const timeoutPromise = new Promise<{ data: D | null; error: PostgrestError }>(
+    (resolve) => {
+      timer = setTimeout(() => resolve({ data: null, error: timeoutError }), timeoutMs);
+    }
+  );
+
   return Promise.race([
-    Promise.resolve(promise).finally(() => clearTimeout(timer!)),
+    Promise.resolve(query).finally(() => clearTimeout(timer!)),
     timeoutPromise,
   ]);
 }
@@ -173,12 +198,15 @@ export async function getPublishedArtists(
   const to = from + pageSize - 1;
   query = query.range(from, to);
 
-  const fallbackResult = { data: null, count: 0, error: null } as unknown as Awaited<typeof query>;
-  const { data, count, error } = await withTimeout(
+  const result = await withQueryTimeout<PublicArtistSummary[]>(
     query,
     4000,
-    fallbackResult
+    "artist discovery"
   );
+  const { data, error } = result;
+  // `count` is part of the Postgrest response when { count: "exact" } is used.
+  // We cast only this narrow accessor — the error/data shape is fully typed above.
+  const count = (result as { count?: number | null }).count ?? null;
 
   if (error) {
     console.error("Error fetching published artists:", error.message);
@@ -197,7 +225,7 @@ export async function getPublishedArtists(
   const totalPages = Math.ceil(totalCount / pageSize);
 
   return {
-    artists: (data as PublicArtistSummary[]) || [],
+    artists: data ?? [],
     totalCount,
     page,
     pageSize,
@@ -225,18 +253,18 @@ export async function getPublishedCategoriesAndCities(): Promise<{
     .select("category, city")
     .eq("profile_status", "published");
 
-  const { data, error } = await withTimeout(
+  const { data, error } = await withQueryTimeout<{ category: string | null; city: string | null }[]>(
     query,
     4000,
-    { data: null, error: null } as unknown as Awaited<typeof query>
+    "category/city lookup"
   );
 
   if (error || !data) {
     return { categories: [], cities: [] };
   }
 
-  const categories = Array.from(new Set(data.map((d) => d.category).filter(Boolean))).sort();
-  const cities = Array.from(new Set(data.map((d) => d.city).filter(Boolean))).sort();
+  const categories = Array.from(new Set(data.map((d) => d.category).filter((v): v is string => v !== null))).sort();
+  const cities = Array.from(new Set(data.map((d) => d.city).filter((v): v is string => v !== null))).sort();
 
   return { categories, cities };
 }

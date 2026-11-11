@@ -436,6 +436,18 @@ WHERE p.role = 'admin';
     6. TypeScript (`npx tsc --noEmit`), ESLint (`npm run lint`), and Next.js 16 production build (`npm run build`, 16/16 routes) all pass with zero errors.
 - **Next Phase:** **Phase 4.5 Stage 3 — Live Admin Testing & Verification** (currently in progress).
 
+- **Technical Cleanup & Hardening (2026-11-12):** Final cleanup session. No functional changes. All checks pass.
+  - **Git repository:** Initialized at correct project root (`The Artist Network/.git`). Previous `.git` was incorrectly scoped to the parent Desktop directory (would have committed resume PDFs, videos, and unrelated Desktop files). Fixed by running `git init` inside the project folder. First baseline commit `a91e4b9` created: 70 project files, no secrets, no Desktop debris.
+  - **AGENTS.md:** Extended with project-specific AI coding instructions above the Next.js `<!-- BEGIN:nextjs-agent-rules -->` marker. The Next.js block is preserved exactly. Future `next dev` restarts only regenerate content inside the markers; custom project rules above them are permanent.
+  - **proxy.ts (root) vs lib/supabase/proxy.ts:** Both files are required and correctly structured.
+    - `proxy.ts` at the project root is the **Next.js 16 file convention** (official replacement for `middleware.ts`, documented in `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md`). It exports the `proxy(request)` function and `config.matcher`. Next.js invokes this on every matched request.
+    - `lib/supabase/proxy.ts` contains the **Supabase session refresh implementation** (`updateSession()`). The root `proxy.ts` imports and delegates to it. This two-file separation keeps the Next.js file convention entry point thin and the Supabase logic testable in isolation.
+  - **lib/data/artists.ts — timeout hardening:**
+    - **Issue found and fixed:** The old `withTimeout<T>` helper accepted a generic `fallback: T`. On timeout, it resolved with `{ data: null, count: 0, error: null }`. Because `error` was `null`, the caller's error-check was skipped — a database timeout was silently presented as a genuine zero-artist result. This was a correctness bug.
+    - **Fix:** Replaced `withTimeout` with `withQueryTimeout<D>`, a Postgrest-aware helper typed as `Promise<{ data: D | null; error: PostgrestError | null }>`. On timeout it resolves with a real `PostgrestError` (`code: "TIMEOUT"`), so callers that inspect `error` correctly treat timeouts as failures and return empty UI state with a logged warning — not a silent "no results".
+    - **Type safety:** Removed all `as unknown as` casts. The `PostgrestError` object includes the required `toJSON()` method. The `.filter(Boolean)` on nullable string arrays is replaced with an explicit type predicate `(v): v is string => v !== null` to satisfy strict TypeScript. The only remaining narrow cast is `(result as { count?: number | null }).count` for the Postgrest `count` field, which is not part of the base `{ data, error }` response shape exposed by the helper — this is documented in the code.
+  - **Build verification:** `npx tsc --noEmit` → 0 errors; `npm run lint` → 0 errors, 8 pre-existing `<img>` warnings; `npm run build` → all 16 routes, exit 0.
+
 ### What Requires User Action Before Proceeding
 1. The user must execute the **Section 8** script in the Supabase Dashboard SQL Editor to promote their own account to `admin`.
 2. The user must verify the promotion query returns `role = 'admin'`.
