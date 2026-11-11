@@ -672,9 +672,25 @@ All integration checks executed with 100% pass rate:
   7. **Sticky Action Bar:** White frosted glass bar (`bg-white/95 backdrop-blur-md border border-gray-200/90 rounded-2xl shadow-xl`) with `Save Draft` and gradient `Submit for Review →` button.
 - **Verification:** TypeScript: 0 errors, ESLint: 0 errors, Production build: 16/16 routes compiled cleanly. Git commit `623e8e5`.
 
-### 12.6 Next Steps & Phase Boundaries
+### 12.6 Full Platform UI Harmonization & Timeout Optimization
 
-- **Phase 4.5 Stage 3:** Complete. Test accounts are ready, verified, and UI is fully synchronized.
+- **Objective:** Extend the consistent light design system established in `/dashboard/artist` and `/dashboard/artist/edit` across Login, Signup, and the entire Admin Portal, eliminating visual discrepancies and resolving developer server timeout warnings.
+- **Files Harmonized:**
+  - `app/login/page.tsx`: Transformed to clean light card (`bg-white rounded-2xl border border-gray-200 shadow-sm`), light role switcher tabs, white form inputs with purple focus halos, hidden dev banner when live backend is active.
+  - `app/signup/page.tsx`: Transformed to light card, light role switcher (`bg-purple-50 text-purple-700 border-purple-200` active vs `bg-white text-gray-600` inactive), clean email confirmation prompt.
+  - `app/admin/layout.tsx`: Updated canvas to `bg-gray-50 text-gray-900` with white footer.
+  - `app/components/AdminNavbar.tsx`: Light header (`bg-white border-b border-gray-200 text-gray-900 shadow-xs`), purple active tabs (`bg-purple-50 text-purple-700 border-purple-200`).
+  - `app/admin/page.tsx`: Light overview metrics cards (`bg-white border border-gray-200 shadow-sm`) with amber, emerald, purple, and blue status pills, light pending review preview cards.
+  - `app/admin/applications/page.tsx`: Light page header and subtitle typography.
+  - `app/components/ApplicationsManager.tsx`: Light filter pill tabs, light application directory table (`bg-white border border-gray-200 rounded-2xl shadow-sm`, `bg-gray-50/80` headers), and light modal review dialog.
+  - `app/admin/audit-logs/page.tsx`: Light header typography (`text-gray-900`).
+  - `app/components/AuditLogViewer.tsx`: Light audit records table (`bg-white border border-gray-200 rounded-2xl shadow-sm`), light action badges (emerald, rose, purple, gray), light pagination footer, and light JSON inspection drawer.
+  - `lib/data/artists.ts`: Relaxed query timeout threshold from `4000ms` to `8000ms` to accommodate remote database network latency and cold-starts, and converted fallback logging to `console.warn` to prevent Next.js Turbopack development overlay popups.
+- **Verification:** TypeScript: 0 errors, ESLint: 0 errors, Production build: 16/16 routes compiled cleanly. Git commit `f81542e`.
+
+### 12.7 Next Steps & Phase Boundaries
+
+- **Phase 4.5 Stage 3:** Complete. Test accounts are ready, verified, and UI is fully synchronized across all client, auth, and admin interfaces.
 - **Phase 5:** NOT STARTED (Strict rule: Phase 5 remains blocked until explicit user sign-off).
 
 
