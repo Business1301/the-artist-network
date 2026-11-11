@@ -417,6 +417,16 @@ WHERE p.role = 'admin';
 
 ### Exactly Where Development Stopped
 - **Phase 4.5 Stage 1 (Database):** Fully deployed and verified in Supabase PostgreSQL.
+- **Website Reload Loop Fix (2026-11-12):** Resolved repeated page reloads on `/signup` and client routes.
+  - **Root Cause 1 (Hydration Mismatch):** `Navbar.tsx` accessed `localStorage.getItem("tan_auth_user")` directly within the initial `useState` callback. On public client pages where `initialUser === undefined`, SSR rendered the guest navbar ("Sign In", "Join as Artist") while client hydration immediately rendered the authenticated navbar ("Dashboard", "Log Out"). React threw `Hydration failed because the server rendered HTML didn't match the client`, triggering Next.js dev error-recovery reloads in an infinite loop.
+  - **Root Cause 2 (Stale Turbopack Dev Chunks):** Running `npm run build` while `npm run dev` was active overwrote the `.next` directory with production manifests. The running dev server then served mismatched chunks, causing `ChunkLoadError` and unhandled rejections that forced Turbopack's HMR client to reload repeatedly.
+  - **Resolution:**
+    1. `Navbar.tsx`: State initializes to `initialUser ?? null` on both server and client (never accesses `localStorage` or `window` in `useState`). SSR and client hydration output identical HTML.
+    2. Synchronously adjust user state on SSR prop change using React recommended pattern (`prevUserId !== initialUserId`).
+    3. `useEffect` handles post-hydration async `getCurrentUser()` call cleanly without cascading render warnings.
+    4. Explicitly configured `turbopack: { root: process.cwd() }` in `next.config.ts`.
+    5. Cleaned corrupted `.next` cache and restarted dev server cleanly.
+
 - **Phase 4.5 Stage 2 (Application Layer):** Fully implemented and verified.
 - **Phase 4.5 Stage 2.1 (Dashboard Security Fix):** Fully implemented and build-verified. Server-side role guards protect all dashboard routes.
 - **Owner Activation:** Completed in database (sole administrator confirmed).
