@@ -176,13 +176,13 @@ export default function PortfolioManager({
   };
 
   return (
-    <div className="bg-gray-900/70 border border-gray-800 rounded-2xl p-6 sm:p-8 shadow-sm">
+    <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 shadow-sm">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-base font-bold text-white flex items-center gap-2">
+          <h2 className="text-base sm:text-lg font-bold text-gray-900 flex items-center gap-2">
             <span>🎨</span> Portfolio &amp; Media Showcase
           </h2>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-gray-500 mt-1">
             Add high-resolution performance photos and embedded YouTube videos to showcase your live acts.
           </p>
         </div>
@@ -191,7 +191,7 @@ export default function PortfolioManager({
           <button
             type="button"
             onClick={() => setIsAdding(true)}
-            className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-md transition-colors self-start sm:self-auto"
+            className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-sm transition-colors self-start sm:self-auto"
           >
             + Add Media Item
           </button>
@@ -203,14 +203,14 @@ export default function PortfolioManager({
         <div
           className={`mb-4 p-3 rounded-xl text-xs flex items-center justify-between ${
             statusMessage.type === "success"
-              ? "bg-emerald-950/70 border border-emerald-500/40 text-emerald-300"
-              : "bg-rose-950/70 border border-rose-500/40 text-rose-300"
+              ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
+              : "bg-rose-50 border border-rose-200 text-rose-800"
           }`}
         >
           <span>{statusMessage.text}</span>
           <button
             onClick={() => setStatusMessage(null)}
-            className="text-gray-400 hover:text-white font-bold ml-2"
+            className="text-gray-400 hover:text-gray-700 font-bold ml-2"
           >
             ✕
           </button>
@@ -219,15 +219,15 @@ export default function PortfolioManager({
 
       {/* Add New Item Form */}
       {isAdding && (
-        <div className="mb-8 p-5 rounded-2xl bg-gray-950 border border-purple-500/30 shadow-inner">
+        <div className="mb-8 p-5 rounded-2xl bg-gray-50 border border-purple-200 shadow-xs">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xs font-bold text-purple-300 uppercase tracking-wider">
+            <h3 className="text-xs font-bold text-purple-700 uppercase tracking-wider">
               New Portfolio Item
             </h3>
             <button
               type="button"
               onClick={() => setIsAdding(false)}
-              className="text-xs text-gray-400 hover:text-white"
+              className="text-xs text-gray-500 hover:text-gray-800 font-semibold"
             >
               Cancel
             </button>
@@ -237,7 +237,7 @@ export default function PortfolioManager({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Media Type */}
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1">
+                <label className="block text-xs font-bold text-gray-700 mb-1">
                   Media Type
                 </label>
                 <select
@@ -247,7 +247,7 @@ export default function PortfolioManager({
                       e.target.value as "image" | "youtube" | "audio" | "link"
                     )
                   }
-                  className="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white focus:border-purple-500 focus:outline-none"
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-gray-300 text-xs text-gray-900 focus:border-purple-600 focus:outline-none"
                 >
                   <option value="image">📸 Performance Photograph</option>
                   <option value="youtube">🎥 YouTube Video Embed</option>
@@ -258,8 +258,8 @@ export default function PortfolioManager({
 
               {/* Title */}
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1">
-                  Item Title <span className="text-rose-400">*</span>
+                <label className="block text-xs font-bold text-gray-700 mb-1">
+                  Item Title <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -267,14 +267,14 @@ export default function PortfolioManager({
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Live Performance at Sangeet Gala"
                   required
-                  className="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none"
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-gray-300 text-xs text-gray-900 placeholder-gray-400 focus:border-purple-600 focus:outline-none"
                 />
               </div>
             </div>
 
             {/* Description */}
             <div>
-              <label className="block text-xs font-semibold text-gray-300 mb-1">
+              <label className="block text-xs font-bold text-gray-700 mb-1">
                 Short Description (Optional)
               </label>
               <input
@@ -282,13 +282,13 @@ export default function PortfolioManager({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="e.g. Acoustic medley performed for 500+ guests in Udaipur"
-                className="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none"
+                className="w-full px-3 py-2 rounded-xl bg-white border border-gray-300 text-xs text-gray-900 placeholder-gray-400 focus:border-purple-600 focus:outline-none"
               />
             </div>
 
             {/* Media URL / Upload Input */}
             <div>
-              <label className="block text-xs font-semibold text-gray-300 mb-1">
+              <label className="block text-xs font-bold text-gray-700 mb-1">
                 {mediaType === "image"
                   ? "Image Upload or URL"
                   : mediaType === "youtube"
@@ -298,7 +298,7 @@ export default function PortfolioManager({
 
               {mediaType === "image" ? (
                 <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-                  <label className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-xs font-semibold text-gray-200 cursor-pointer transition-colors">
+                  <label className="px-3 py-2 rounded-xl bg-white hover:bg-gray-100 border border-gray-300 text-xs font-semibold text-gray-700 cursor-pointer transition-colors shadow-2xs">
                     {isUploading ? "Uploading..." : "📁 Upload Photo (Max 5MB)"}
                     <input
                       type="file"
@@ -308,13 +308,13 @@ export default function PortfolioManager({
                       disabled={isUploading}
                     />
                   </label>
-                  <span className="text-xs text-gray-500">or</span>
+                  <span className="text-xs text-gray-400">or</span>
                   <input
                     type="url"
                     value={mediaUrl}
                     onChange={(e) => setMediaUrl(e.target.value)}
                     placeholder="Paste direct image URL"
-                    className="flex-1 w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none"
+                    className="flex-1 w-full px-3 py-2 rounded-xl bg-white border border-gray-300 text-xs text-gray-900 placeholder-gray-400 focus:border-purple-600 focus:outline-none"
                   />
                 </div>
               ) : (
@@ -328,7 +328,7 @@ export default function PortfolioManager({
                       : "https://soundcloud.com/..."
                   }
                   required
-                  className="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none"
+                  className="w-full px-3 py-2 rounded-xl bg-white border border-gray-300 text-xs text-gray-900 placeholder-gray-400 focus:border-purple-600 focus:outline-none"
                 />
               )}
             </div>
@@ -338,14 +338,14 @@ export default function PortfolioManager({
               <button
                 type="button"
                 onClick={() => setIsAdding(false)}
-                className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-xs font-semibold text-gray-300"
+                className="px-4 py-2 rounded-xl border border-gray-300 hover:bg-gray-100 text-xs font-semibold text-gray-700"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isPending || isUploading}
-                className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all disabled:opacity-50"
+                className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-all disabled:opacity-50 shadow-sm"
               >
                 {isPending ? "Adding..." : "Save Media Item"}
               </button>
@@ -356,9 +356,9 @@ export default function PortfolioManager({
 
       {/* Portfolio Items Grid */}
       {items.length === 0 ? (
-        <div className="text-center py-10 border border-dashed border-gray-800 rounded-2xl">
+        <div className="text-center py-10 border border-dashed border-gray-200 rounded-2xl bg-gray-50/50">
           <span className="text-3xl block mb-2">📸</span>
-          <p className="text-xs font-semibold text-gray-300">No portfolio items added yet.</p>
+          <p className="text-xs font-bold text-gray-700">No portfolio items added yet.</p>
           <p className="text-[11px] text-gray-500 mt-1 max-w-sm mx-auto">
             Adding 2-3 stage photos and a live YouTube clip drastically increases client bookings.
           </p>
@@ -368,10 +368,10 @@ export default function PortfolioManager({
           {items.map((item, index) => (
             <div
               key={item.id}
-              className="bg-gray-950 border border-gray-800 rounded-2xl overflow-hidden shadow-sm flex flex-col justify-between group"
+              className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs hover:border-purple-300 transition-all flex flex-col justify-between group"
             >
               {/* Media Preview */}
-              <div className="aspect-video bg-gray-900 relative overflow-hidden">
+              <div className="aspect-video bg-gray-100 relative overflow-hidden">
                 {item.media_type === "image" ? (
                   <img
                     src={item.media_url}
@@ -387,11 +387,11 @@ export default function PortfolioManager({
                     allowFullScreen
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs p-4 text-center">
+                  <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs p-4 text-center">
                     <span>🎵 Audio / External Link</span>
                   </div>
                 )}
-                <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-900/80 text-gray-300 uppercase tracking-wider backdrop-blur-sm">
+                <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md text-[10px] font-bold bg-white/90 text-gray-700 uppercase tracking-wider backdrop-blur-sm border border-gray-200/60 shadow-2xs">
                   {item.media_type}
                 </span>
               </div>
@@ -399,20 +399,20 @@ export default function PortfolioManager({
               {/* Details & Controls */}
               <div className="p-4 flex-1 flex flex-col justify-between">
                 <div>
-                  <h4 className="text-xs font-bold text-white mb-0.5 truncate">{item.title}</h4>
+                  <h4 className="text-xs font-bold text-gray-900 mb-0.5 truncate">{item.title}</h4>
                   {item.description && (
-                    <p className="text-[11px] text-gray-400 line-clamp-2">{item.description}</p>
+                    <p className="text-[11px] text-gray-500 line-clamp-2">{item.description}</p>
                   )}
                 </div>
 
-                <div className="flex items-center justify-between border-t border-gray-800/80 pt-3 mt-3">
+                <div className="flex items-center justify-between border-t border-gray-100 pt-3 mt-3">
                   {/* Reordering */}
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
                       disabled={index === 0}
                       onClick={() => handleMove(index, "up")}
-                      className="p-1 rounded hover:bg-gray-800 text-gray-400 hover:text-white disabled:opacity-20 text-xs"
+                      className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 disabled:opacity-20 text-xs"
                       title="Move Up"
                     >
                       ▲
@@ -421,7 +421,7 @@ export default function PortfolioManager({
                       type="button"
                       disabled={index === items.length - 1}
                       onClick={() => handleMove(index, "down")}
-                      className="p-1 rounded hover:bg-gray-800 text-gray-400 hover:text-white disabled:opacity-20 text-xs"
+                      className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700 disabled:opacity-20 text-xs"
                       title="Move Down"
                     >
                       ▼
@@ -432,7 +432,7 @@ export default function PortfolioManager({
                   <button
                     type="button"
                     onClick={() => handleDeleteItem(item.id)}
-                    className="text-xs text-rose-400 hover:text-rose-300 font-semibold"
+                    className="text-xs text-rose-600 hover:text-rose-700 font-semibold"
                   >
                     Delete
                   </button>
