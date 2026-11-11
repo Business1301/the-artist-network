@@ -434,7 +434,9 @@ WHERE p.role = 'admin';
        - Business (`role === 'business'`) → `🏢 Business Dashboard` (`/dashboard/restaurant`) + `Log Out`
        - Logged-out visitor → `Sign In` (`/login`) + `Join as Artist` (`/signup`)
     6. TypeScript (`npx tsc --noEmit`), ESLint (`npm run lint`), and Next.js 16 production build (`npm run build`, 16/16 routes) all pass with zero errors.
-- **Next Phase:** **Phase 4.5 Stage 3 — Live Admin Testing & Verification** (currently in progress).
+- **Phase 4.5 Stage 3 — Integration Audit (2026-11-12):** Non-destructive code inspection + static analysis completed. Browser test blocked (requires Chrome with remote debugging — user must launch Chrome before live browser tests can run). All findings documented below.
+
+- **Next Phase:** **Phase 4.5 Stage 3 — Live Browser Testing** (blocked on Chrome remote debugging; see Section 11).
 
 - **Technical Cleanup & Hardening (2026-11-12):** Final cleanup session. No functional changes. All checks pass.
   - **Git repository:** Initialized at correct project root (`The Artist Network/.git`). Previous `.git` was incorrectly scoped to the parent Desktop directory (would have committed resume PDFs, videos, and unrelated Desktop files). Fixed by running `git init` inside the project folder. First baseline commit `a91e4b9` created: 70 project files, no secrets, no Desktop debris.
@@ -465,3 +467,104 @@ WHERE p.role = 'admin';
    - **Cross-role boundary test:** Log in as an artist → attempt to visit `/admin` directly → confirm redirect to `/dashboard/artist` (handled by `requireAdmin()`).
 3. Proceed to **Phase 5 (Business Accounts & Booking Enquiries)** only after the user explicitly signs off on Phase 4.5 Stage 3.
 
+
+---
+
+## 11. Phase 4.5 Stage 3 — Integration Audit Results (2026-11-12)
+
+### Method
+Static code inspection + build verification. Live browser tests blocked pending Chrome remote debugging setup (see §11.4).
+
+### 11.1 Route Protection — PASS (Code-Verified)
+
+All protected routes have server-side authorization guards enforced at the layout level (before any child page renders):
+
+| Route Prefix | Layout File | Guard | Redirect on Fail |
+|---|---|---|---|
+| `/admin/*` | `app/admin/layout.tsx` | `requireAdmin()` | `/login?redirectTo=/admin` |
+| `/dashboard/artist/*` | `app/dashboard/artist/layout.tsx` | `requireArtist()` | `/login?redirectTo=/dashboard/artist` |
+| `/dashboard/artist/edit` | Covered by artist layout | `requireArtist()` | (same) |
+| `/dashboard/restaurant/*` | `app/dashboard/restaurant/layout.tsx` | `requireBusiness()` | `/login?redirectTo=/dashboard/restaurant` |
+
+**Cookie pre-check:** All three guards check for session cookies first. No cookies → instant redirect with no Supabase remote call.  
+**Full auth path:** When cookies exist → `supabase.auth.getUser()` remote verify → `public.profiles` DB role check. Cookie presence alone is never sufficient.
+
+### 11.2 Cross-Role Redirect Matrix — PASS (Code-Verified)
+
+| Visitor Role | Visits | Redirected To |
+|---|---|---|
+| Unauthenticated | `/admin` | `/login?redirectTo=/admin` |
+| Unauthenticated | `/dashboard/artist` | `/login?redirectTo=/dashboard/artist` |
+| Unauthenticated | `/dashboard/restaurant` | `/login?redirectTo=/dashboard/restaurant` |
+| `artist` | `/admin` | `/dashboard/artist` (via `requireAdmin()` else branch) |
+| `artist` | `/dashboard/restaurant` | `/dashboard/artist` (via `requireBusiness()`) |
+| `business` | `/admin` | `/dashboard/restaurant` (via `requireAdmin()` else branch) |
+| `business` | `/dashboard/artist` | `/dashboard/restaurant` (via `requireArtist()`) |
+| `admin` | `/dashboard/artist` | `/admin` (via `requireArtist()`) |
+| `admin` | `/dashboard/restaurant` | `/admin` (via `requireBusiness()`) |
+
+### 11.3 Navbar Auth State — PASS (Code-Verified)
+
+All five public pages pass server-fetched `initialUser` to `<Navbar />`:
+
+| Page | Server Action | Navbar Prop |
+|---|---|---|
+| `/` (`app/page.tsx`) | `getCurrentUser()` | `initialUser={currentUser}` ✅ |
+| `/artists` (`app/artists/page.tsx`) | `getCurrentUser()` | `initialUser={currentUser}` ✅ |
+| `/artists/[slug]` | `getCurrentUser()` | `initialUser={currentUser}` ✅ |
+| `/categories` | `getCurrentUser()` | `initialUser={currentUser}` ✅ |
+| `/opportunities` | `getCurrentUser()` | `initialUser={currentUser}` ✅ |
+
+**Role-to-link mapping in Navbar** (code-verified):
+- `role === "admin"` → 🛡️ Admin Dashboard (`/admin`) + Log Out
+- `role === "business"` → 🏢 Business Dashboard (`/dashboard/restaurant`) + Log Out
+- `role === "artist"` → 🎨 Artist Dashboard (`/dashboard/artist`) + Log Out
+- Logged out → Sign In + Join as Artist
+
+**Open redirect defense:** `getSafeRedirectPath()` validates all post-login redirects. Rejects `//`, `\`, null bytes, and blocks non-admin roles from being redirected to `/admin/*`.
+
+### 11.4 Known Gap — Artist Directory DB Error vs. Empty State
+
+**Status: Identified — Not Fixed (accepted risk for current phase)**
+
+`getPublishedArtists()` returns `artists: []` on both a genuine empty database AND on a DB timeout/error. The page shows "Curating Our Artist Roster" in both cases. After the `withQueryTimeout` fix, timeouts now log a `console.error` server-side — but the UI cannot distinguish timeout from genuine zero artists, because `ArtistDiscoveryResult` has no `dbError` flag.
+
+**Risk level:** Low. Currently there are no published artists, so both states are indistinguishable anyway. Users see the demo showcase prompt either way. When real artists are published, a timeout would falsely show zero artists for 4 seconds. Recommend adding `dbError?: boolean` to `ArtistDiscoveryResult` and a banner in Phase 5 scope.
+
+### 11.5 Dev Server Warning — `AuthRetryableFetchError` / `Date.now()`
+
+The dev server log shows:
+```
+AuthRetryableFetchError: Route "/artists/[slug]": Next.js encountered the unstable value Date.now() while prerendering
+```
+
+**Root cause:** The Supabase `@supabase/ssr` client internally calls `Date.now()` during token refresh. When Next.js PPR tries to statically prerender `/artists/[slug]` metadata during development, it catches this. Both the page and `generateMetadata` have `await connection()` and `export const instant = false`, which correctly opts them out of static prerendering at request time. This warning appears in dev mode only, does **not** affect production builds (all 16 routes compiled without errors), and is a Supabase SDK internals issue — not something to fix in application code.
+
+### 11.6 Browser Tests — BLOCKED
+
+Live browser tests (login flow, session persistence, admin dashboard KPIs, moderation queue, audit logs) require Chrome with remote debugging enabled. Tests were not able to run automatically.
+
+**To enable browser tests:**
+1. Close all Chrome windows
+2. Run: `"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222`
+3. Tell the AI assistant you are ready — browser tests will be re-delegated automatically
+
+### 11.7 Build Verification at Audit Time — PASS
+
+- `npx tsc --noEmit` → 0 errors ✅
+- `npm run lint` → 0 errors, 8 pre-existing `<img>` warnings ✅
+- `npm run build` → all 16 routes, exit 0 ✅
+- Git commit `b408aab` is the current HEAD
+
+### 11.8 Remaining Live Tests (Requires Browser + Real Accounts)
+
+The following must be verified manually or via browser automation with real credentials:
+
+1. **Admin login test:** Log in with owner credentials → confirm redirect to `/admin`
+2. **Admin KPI cards:** Verify numbers on `/admin` are live DB counts (not zeros)
+3. **Application queue:** Visit `/admin/applications` — confirm pending artists appear
+4. **Moderation actions:** Approve/reject with reason, verify/unverify badge (use a test artist account — do not touch real applications)
+5. **Audit log test:** Confirm each moderation action creates an audit entry
+6. **Artist session persistence:** Log in as artist → navigate `/artists` → navbar shows "🎨 Artist Dashboard"
+7. **Logout test:** Click Log Out → confirm redirect to `/` → navbar returns to logged-out state
+8. **Browser refresh test:** Log in → navigate to `/artists` → hard refresh → navbar still shows logged-in state (session persisted via SSR cookie)
