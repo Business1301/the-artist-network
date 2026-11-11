@@ -9,7 +9,7 @@ export const instant = false;
 
 export default async function AdminOverviewPage() {
   const metrics = await getAdminMetrics();
-  const pendingApplications = await getArtistApplications("pending_review");
+  const suspendedProfiles = await getArtistApplications("suspended");
   const recentAudit = await getAdminAuditLogs(1, 6);
 
   return (
@@ -21,7 +21,7 @@ export default async function AdminOverviewPage() {
             Platform Management Overview
           </h1>
           <p className="text-xs sm:text-sm text-gray-500 mt-1">
-            Real-time marketplace metrics, pending moderation queue, and security audit log.
+            Real-time marketplace metrics, moderation controls, and security audit log.
           </p>
         </div>
 
@@ -30,10 +30,10 @@ export default async function AdminOverviewPage() {
             href="/admin/applications"
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs transition-colors shadow-sm"
           >
-            <span>Review Applications</span>
-            {metrics.pendingApplications > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-gray-900 font-black text-[10px]">
-                {metrics.pendingApplications}
+            <span>Manage Artist Profiles</span>
+            {metrics.suspendedProfiles > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-rose-400 text-gray-900 font-black text-[10px]">
+                {metrics.suspendedProfiles} suspended
               </span>
             )}
           </Link>
@@ -42,29 +42,29 @@ export default async function AdminOverviewPage() {
 
       {/* KPI Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Metric 1: Pending Applications */}
+        {/* Metric 1: Suspended Profiles */}
         <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:border-purple-200 transition-colors">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-gray-500">Pending Review</span>
-            <span className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center text-sm font-bold">
-              ⏳
+            <span className="text-xs font-semibold text-gray-500">Suspended Profiles</span>
+            <span className="w-8 h-8 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 flex items-center justify-center text-sm font-bold">
+              🚫
             </span>
           </div>
           <div className="mt-3">
             <div className="text-3xl font-extrabold text-gray-900">
-              {metrics.pendingApplications}
+              {metrics.suspendedProfiles}
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Applications awaiting owner moderation
+              Profiles suspended for policy violations
             </p>
           </div>
-          {metrics.pendingApplications > 0 && (
+          {metrics.suspendedProfiles > 0 && (
             <div className="mt-4 pt-3 border-t border-gray-100">
               <Link
-                href="/admin/applications"
-                className="text-xs font-semibold text-amber-700 hover:text-amber-800 inline-flex items-center gap-1"
+                href="/admin/applications?status=suspended"
+                className="text-xs font-semibold text-rose-700 hover:text-rose-800 inline-flex items-center gap-1"
               >
-                Review queue &rarr;
+                Review suspended &rarr;
               </Link>
             </div>
           )}
@@ -147,23 +147,23 @@ export default async function AdminOverviewPage() {
 
       {/* Grid: Pending Review Queue & Recent Audit Events */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Left: Pending Review Queue */}
+        {/* Left: Suspended Profiles Moderation Queue */}
         <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
           <div className="flex items-center justify-between pb-4 border-b border-gray-100">
             <div>
               <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                <span>Pending Review Queue</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200">
-                  {pendingApplications.length}
+                <span>Suspended Profiles Queue</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-50 text-rose-700 border border-rose-200">
+                  {suspendedProfiles.length}
                 </span>
               </h2>
               <p className="text-xs text-gray-500 mt-0.5">
-                Artists waiting for your moderation decision
+                Profiles currently frozen due to administrative action
               </p>
             </div>
 
             <Link
-              href="/admin/applications"
+              href="/admin/applications?status=suspended"
               className="text-xs text-purple-600 hover:text-purple-800 font-semibold"
             >
               View All &rarr;
@@ -171,16 +171,16 @@ export default async function AdminOverviewPage() {
           </div>
 
           <div className="mt-4 divide-y divide-gray-100">
-            {pendingApplications.length === 0 ? (
+            {suspendedProfiles.length === 0 ? (
               <div className="py-12 text-center">
-                <span className="text-3xl block mb-2">🎉</span>
-                <p className="text-sm font-bold text-gray-900">Queue is completely clear!</p>
+                <span className="text-3xl block mb-2">🛡️</span>
+                <p className="text-sm font-bold text-gray-900">No suspended profiles</p>
                 <p className="text-xs text-gray-500 mt-1">
-                  All submitted artist applications have been moderated.
+                  The marketplace is clean. All active artist profiles are in good standing.
                 </p>
               </div>
             ) : (
-              pendingApplications.slice(0, 5).map((app) => (
+              suspendedProfiles.slice(0, 5).map((app) => (
                 <div key={app.id} className="py-3.5 flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -196,12 +196,7 @@ export default async function AdminOverviewPage() {
                       <span>•</span>
                       <span>{app.experience_years} yrs exp</span>
                       <span>•</span>
-                      <span>
-                        Submitted {new Date(app.created_at).toLocaleDateString("en-IN", {
-                          day: "numeric",
-                          month: "short",
-                        })}
-                      </span>
+                      <span className="text-rose-600 font-medium">Suspended</span>
                     </div>
                   </div>
 
@@ -209,7 +204,7 @@ export default async function AdminOverviewPage() {
                     href={`/admin/applications?review=${app.id}`}
                     className="shrink-0 px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-semibold transition-colors shadow-2xs"
                   >
-                    Review
+                    Moderate
                   </Link>
                 </div>
               ))
@@ -250,7 +245,11 @@ export default async function AdminOverviewPage() {
             ) : (
               recentAudit.logs.map((log) => {
                 const actionBadge =
-                  log.action === "approve_profile"
+                  log.action === "suspend_profile"
+                    ? { label: "Suspended", color: "bg-rose-50 text-rose-700 border-rose-200" }
+                    : log.action === "reinstate_profile"
+                    ? { label: "Reinstated", color: "bg-blue-50 text-blue-700 border-blue-200" }
+                    : log.action === "approve_profile"
                     ? { label: "Approved", color: "bg-emerald-50 text-emerald-700 border-emerald-200" }
                     : log.action === "reject_profile"
                     ? { label: "Rejected", color: "bg-rose-50 text-rose-700 border-rose-200" }

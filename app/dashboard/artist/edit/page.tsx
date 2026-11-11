@@ -10,7 +10,8 @@ import { createClient } from "@/lib/supabase/client";
 import {
   getArtistProfile,
   saveArtistProfile,
-  submitProfileForReview,
+  publishProfile,
+  unpublishProfile,
   ArtistProfileData,
   PortfolioItemData,
 } from "@/app/actions/artist";
@@ -327,23 +328,25 @@ export default function ArtistProfileEditorPage() {
         youtube_url: youtubeUrl,
         facebook_url: facebookUrl,
         website_url: websiteUrl,
-        profile_status: existingProfile?.profile_status || "draft",
+        profile_status: existingProfile?.profile_status === "published" ? "published" : "draft",
       });
 
       if (!res.success) {
-        setStatusMessage({ type: "error", text: res.message || "Failed to save draft." });
+        setStatusMessage({ type: "error", text: res.message || "Failed to save profile." });
       } else {
         setExistingProfile(res.profile || null);
         setStatusMessage({
           type: "success",
-          text: "Changes saved successfully as a draft! You can continue editing or submit for review when ready.",
+          text: existingProfile?.profile_status === "published"
+            ? "Live profile updated successfully!"
+            : "Changes saved successfully as a draft! Click 'Publish Profile' when you are ready to go live.",
         });
       }
     });
   };
 
-  // Submit for Review
-  const handleSubmitReview = () => {
+  // Publish Profile immediately (self-publishing)
+  const handlePublish = () => {
     setStatusMessage(null);
     startTransition(async () => {
       // First save current fields
@@ -372,18 +375,32 @@ export default function ArtistProfileEditorPage() {
       if (!saveRes.success) {
         setStatusMessage({
           type: "error",
-          text: saveRes.message || "Failed to update profile before submission.",
+          text: saveRes.message || "Failed to update profile before publishing.",
         });
         return;
       }
 
-      // Then trigger status transition to pending_review
-      const submitRes = await submitProfileForReview();
-      if (!submitRes.success) {
-        setStatusMessage({ type: "error", text: submitRes.message });
+      // Then trigger self-publish
+      const pubRes = await publishProfile();
+      if (!pubRes.success) {
+        setStatusMessage({ type: "error", text: pubRes.message });
       } else {
-        setStatusMessage({ type: "success", text: submitRes.message });
-        setExistingProfile((prev) => (prev ? { ...prev, profile_status: "pending_review" } : null));
+        setStatusMessage({ type: "success", text: pubRes.message });
+        setExistingProfile((prev) => (prev ? { ...prev, profile_status: "published" } : null));
+      }
+    });
+  };
+
+  // Unpublish Profile (take offline to draft)
+  const handleUnpublish = () => {
+    setStatusMessage(null);
+    startTransition(async () => {
+      const unpubRes = await unpublishProfile();
+      if (!unpubRes.success) {
+        setStatusMessage({ type: "error", text: unpubRes.message });
+      } else {
+        setStatusMessage({ type: "success", text: unpubRes.message });
+        setExistingProfile((prev) => (prev ? { ...prev, profile_status: "draft" } : null));
       }
     });
   };
@@ -403,8 +420,9 @@ export default function ArtistProfileEditorPage() {
     );
   }
 
-  const isPendingReview = existingProfile?.profile_status === "pending_review";
+  const isSuspended = existingProfile?.profile_status === "suspended";
   const isPublished = existingProfile?.profile_status === "published";
+  const isPendingReview = existingProfile?.profile_status === "pending_review";
   const isRejected = existingProfile?.profile_status === "rejected";
 
   return (
@@ -476,6 +494,8 @@ export default function ArtistProfileEditorPage() {
                       className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${
                         isPublished
                           ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : isSuspended
+                          ? "bg-rose-50 text-rose-700 border border-rose-200"
                           : isPendingReview
                           ? "bg-amber-50 text-amber-700 border border-amber-200"
                           : isRejected
@@ -484,9 +504,11 @@ export default function ArtistProfileEditorPage() {
                       }`}
                     >
                       {isPublished
-                        ? "● Approved & Live"
+                        ? "● Live on Marketplace"
+                        : isSuspended
+                        ? "🚫 Suspended by Admin"
                         : isPendingReview
-                        ? "⏳ Under Review"
+                        ? "⏳ Legacy: In Review"
                         : isRejected
                         ? "⚠️ Changes Needed"
                         : "📝 Draft in Progress"}
@@ -540,14 +562,34 @@ export default function ArtistProfileEditorPage() {
                 />
               </div>
               <p className="text-[11px] text-gray-400 mt-2">
-                {isRejected
-                  ? `Review notes: ${existingProfile?.rejection_reason || "Please update your profile details and resubmit."}`
+                {isSuspended
+                  ? `Suspension reason: ${existingProfile?.rejection_reason || "Violation of marketplace standards."}`
+                  : isRejected
+                  ? `Review notes: ${existingProfile?.rejection_reason || "Please update your profile details and publish."}`
                   : completeness < 100
                   ? "Tip: Add your stage name, bio (30+ chars), photos, rates, genres, and portfolio to reach 100%."
-                  : "Excellent! Your profile is 100% complete and ready for booking inquiries."}
+                  : "Excellent! Your profile is 100% complete and ready to be published."}
               </p>
             </div>
           </div>
+
+          {/* Suspended Alert Banner */}
+          {isSuspended && (
+            <div className="mb-6 p-5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 shadow-sm flex items-start gap-4">
+              <span className="text-2xl">🚫</span>
+              <div>
+                <h3 className="text-sm font-bold text-rose-900">Your profile is suspended</h3>
+                <p className="text-xs text-rose-700 mt-1 leading-relaxed">
+                  {existingProfile?.rejection_reason
+                    ? `Administrative note: "${existingProfile.rejection_reason}"`
+                    : "An administrator has suspended your account. Editing your profile and portfolio is frozen."}
+                </p>
+                <p className="text-xs text-rose-600 mt-2 font-semibold">
+                  To appeal or request reinstatement, please contact support.
+                </p>
+              </div>
+            </div>
+          )}
 
           <form
             onSubmit={(e) => {
@@ -556,6 +598,7 @@ export default function ArtistProfileEditorPage() {
             }}
             className="space-y-8"
           >
+            <fieldset disabled={isSuspended} className="space-y-8">
             {/* SECTION 1: Basic Information */}
             <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 shadow-sm">
               <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-1 flex items-center gap-2">
@@ -1125,6 +1168,7 @@ export default function ArtistProfileEditorPage() {
                 </div>
               </div>
             </div>
+            </fieldset>
 
             {/* SECTION 7: Portfolio Management */}
             {userId && (
@@ -1132,32 +1176,61 @@ export default function ArtistProfileEditorPage() {
                 userId={userId}
                 items={portfolio}
                 onItemsChange={(newItems) => setPortfolio(newItems)}
+                disabled={isSuspended}
               />
             )}
 
             {/* Bottom Floating/Sticky Action Bar */}
-            <div className="sticky bottom-6 z-20 bg-white/95 backdrop-blur-md border border-gray-200/90 rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-xs text-gray-500 text-center sm:text-left">
-                <span>Saving updates your profile draft immediately.</span>
+            <div className={`sticky bottom-6 z-20 bg-white/95 backdrop-blur-md border ${isSuspended ? "border-rose-200" : "border-gray-200/90"} rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4`}>
+              <div className="text-xs text-center sm:text-left">
+                {isSuspended ? (
+                  <span className="text-rose-700 font-semibold">🚫 Profile is suspended. Contact support for assistance.</span>
+                ) : isPublished ? (
+                  <span className="text-emerald-700 font-semibold">● Your profile is live on Discover Artists!</span>
+                ) : (
+                  <span className="text-gray-500">Saving updates your profile draft. Ready to go live? Click Publish!</span>
+                )}
               </div>
 
               <div className="flex items-center gap-3 w-full sm:w-auto">
-                <button
-                  type="submit"
-                  disabled={isPending}
-                  className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-bold transition-all disabled:opacity-50 shadow-2xs"
-                >
-                  {isPending ? "Saving..." : "Save Draft"}
-                </button>
+                {isSuspended ? (
+                  <Link
+                    href="/dashboard/artist"
+                    className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-bold transition-all"
+                  >
+                    Return to Dashboard
+                  </Link>
+                ) : (
+                  <>
+                    <button
+                      type="submit"
+                      disabled={isPending}
+                      className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-bold transition-all disabled:opacity-50 shadow-2xs"
+                    >
+                      {isPending ? "Saving..." : isPublished ? "Save Changes" : "Save Draft"}
+                    </button>
 
-                <button
-                  type="button"
-                  onClick={handleSubmitReview}
-                  disabled={isPending || isPendingReview}
-                  className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs font-bold shadow-md shadow-purple-600/20 transition-all disabled:opacity-50"
-                >
-                  {isPendingReview ? "Under Review" : "Submit for Review →"}
-                </button>
+                    {isPublished ? (
+                      <button
+                        type="button"
+                        onClick={handleUnpublish}
+                        disabled={isPending}
+                        className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all disabled:opacity-50"
+                      >
+                        {isPending ? "Updating..." : "Unpublish Profile"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handlePublish}
+                        disabled={isPending}
+                        className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-xs font-bold shadow-md shadow-purple-600/20 transition-all disabled:opacity-50"
+                      >
+                        {isPending ? "Publishing..." : "Publish Profile →"}
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           </form>

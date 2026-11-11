@@ -64,7 +64,11 @@ export default function AuditLogViewer({
               ) : (
                 logs.map((log) => {
                   const actionBadge =
-                    log.action === "approve_profile"
+                    log.action === "suspend_profile"
+                      ? { label: "Suspend", color: "bg-rose-50 text-rose-700 border-rose-200" }
+                      : log.action === "reinstate_profile"
+                      ? { label: "Reinstate", color: "bg-blue-50 text-blue-700 border-blue-200" }
+                      : log.action === "approve_profile"
                       ? { label: "Approve", color: "bg-emerald-50 text-emerald-700 border-emerald-200" }
                       : log.action === "reject_profile"
                       ? { label: "Reject", color: "bg-rose-50 text-rose-700 border-rose-200" }

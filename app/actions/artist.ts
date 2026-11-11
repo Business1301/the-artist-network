@@ -25,8 +25,8 @@ export interface ArtistProfileData {
   youtube_url: string | null;
   facebook_url: string | null;
   website_url: string | null;
-  profile_status: "draft" | "pending_review" | "published" | "rejected";
-  rejection_reason: string | null;
+  profile_status: "draft" | "published" | "suspended" | "pending_review" | "rejected";
+  rejection_reason: string | null;  // Also used as suspension_reason contextually
   is_verified: boolean;
   created_at: string;
   updated_at: string;
@@ -116,6 +116,17 @@ export async function saveArtistProfile(
     return { success: false, message: "Unauthorized. Please log in." };
   }
 
+  // Block suspended artists from editing (defense-in-depth; DB trigger also enforces this)
+  const { data: existingCheck } = await supabase
+    .from("artist_profiles")
+    .select("profile_status")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (existingCheck?.profile_status === "suspended") {
+    return { success: false, message: "Your profile is suspended. Contact support for assistance." };
+  }
+
   // Validate required minimums for saving draft
   if (!formData.stage_name?.trim()) {
     return { success: false, message: "Artist or stage name is required." };
@@ -127,7 +138,10 @@ export async function saveArtistProfile(
     return { success: false, message: "City location is required." };
   }
 
-  // Sanitize data: Never permit passing is_verified or changing status to published/rejected
+  // Sanitize data: Never permit passing is_verified or suspended status
+  // Preserve published/legacy status for live profiles; default to draft for new/draft
+  const preservedStatuses: string[] = ["published", "pending_review"];
+  const currentStatus = formData.profile_status;
   const payload = {
     id: user.id,
     stage_name: formData.stage_name.trim(),
@@ -150,8 +164,8 @@ export async function saveArtistProfile(
     youtube_url: formData.youtube_url?.trim() || null,
     facebook_url: formData.facebook_url?.trim() || null,
     website_url: formData.website_url?.trim() || null,
-    // Status stays draft unless already submitted
-    profile_status: formData.profile_status === "pending_review" ? "pending_review" : "draft",
+    // Preserve published/legacy status; default to draft for new or draft profiles
+    profile_status: currentStatus && preservedStatuses.includes(currentStatus) ? currentStatus : "draft",
   };
 
   let { data: updated, error } = await supabase
@@ -185,9 +199,12 @@ export async function saveArtistProfile(
 }
 
 /**
- * Submit profile for administrator review
+ * Publish the artist's profile (self-publishing).
+ * Validates mandatory fields at application level (friendly errors).
+ * The database trigger enforce_publication_requirements also validates
+ * at DB level, preventing bypass via direct API calls.
  */
-export async function submitProfileForReview(): Promise<{
+export async function publishProfile(): Promise<{
   success: boolean;
   message: string;
 }> {
@@ -214,15 +231,31 @@ export async function submitProfileForReview(): Promise<{
   if (fetchErr || !profile) {
     return {
       success: false,
-      message: "Please complete and save your profile details before submitting.",
+      message: "Please complete and save your profile details before publishing.",
     };
   }
 
-  // 2. Validate required fields for submission
+  // 2. Block suspended profiles (defense-in-depth; DB trigger also enforces)
+  if (profile.profile_status === "suspended") {
+    return {
+      success: false,
+      message: "Your profile is suspended. Contact support for assistance.",
+    };
+  }
+
+  // 3. Block already-published profiles
+  if (profile.profile_status === "published") {
+    return {
+      success: false,
+      message: "Your profile is already published.",
+    };
+  }
+
+  // 4. Validate required fields for publication (friendly error messages)
   if (!profile.stage_name || !profile.category || !profile.city) {
     return {
       success: false,
-      message: "Stage name, category, and city are required before submission.",
+      message: "Stage name, category, and city are required before publishing.",
     };
   }
   if (!profile.bio || profile.bio.length < 30) {
@@ -234,14 +267,14 @@ export async function submitProfileForReview(): Promise<{
   if (!profile.starting_price || profile.starting_price <= 0) {
     return {
       success: false,
-      message: "Please set your starting performance fee before submitting.",
+      message: "Please set your starting performance fee before publishing.",
     };
   }
 
-  // 3. Update status to pending_review
+  // 5. Set profile to published
   const { error: updateErr } = await supabase
     .from("artist_profiles")
-    .update({ profile_status: "pending_review" })
+    .update({ profile_status: "published" })
     .eq("id", user.id);
 
   if (updateErr) {
@@ -250,7 +283,63 @@ export async function submitProfileForReview(): Promise<{
 
   return {
     success: true,
-    message: "Your profile has been submitted for review! Our curation team will review it shortly.",
+    message: "Your profile is now live! It will appear in Discover Artists.",
+  };
+}
+
+/**
+ * Unpublish the artist's profile (voluntarily take offline).
+ * Sets profile_status back to 'draft'. Preserves all data.
+ */
+export async function unpublishProfile(): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  if (!isSupabaseConfigured()) {
+    return { success: false, message: "Database not configured." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, message: "Unauthorized. Please log in." };
+  }
+
+  // 1. Fetch current profile
+  const { data: profile, error: fetchErr } = await supabase
+    .from("artist_profiles")
+    .select("profile_status")
+    .eq("id", user.id)
+    .single();
+
+  if (fetchErr || !profile) {
+    return { success: false, message: "Profile not found." };
+  }
+
+  // 2. Only published profiles can be unpublished
+  if (profile.profile_status !== "published") {
+    return {
+      success: false,
+      message: "Only published profiles can be unpublished.",
+    };
+  }
+
+  // 3. Set back to draft
+  const { error: updateErr } = await supabase
+    .from("artist_profiles")
+    .update({ profile_status: "draft" })
+    .eq("id", user.id);
+
+  if (updateErr) {
+    return { success: false, message: updateErr.message };
+  }
+
+  return {
+    success: true,
+    message: "Your profile has been unpublished and is now a private draft.",
   };
 }
 
@@ -326,6 +415,16 @@ export async function addPortfolioItem(item: {
     return { success: false, message: "Unauthorized." };
   }
 
+  // Block suspended artists (defense-in-depth; RLS also enforces)
+  const { data: suspCheck } = await supabase
+    .from("artist_profiles")
+    .select("profile_status")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (suspCheck?.profile_status === "suspended") {
+    return { success: false, message: "Your profile is suspended. Contact support for assistance." };
+  }
+
   if (!item.title?.trim() || !item.media_url?.trim()) {
     return { success: false, message: "Title and media URL are required." };
   }
@@ -378,6 +477,16 @@ export async function deletePortfolioItem(
 
   if (!user) {
     return { success: false, message: "Unauthorized." };
+  }
+
+  // Block suspended artists (defense-in-depth; RLS also enforces)
+  const { data: suspCheck } = await supabase
+    .from("artist_profiles")
+    .select("profile_status")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (suspCheck?.profile_status === "suspended") {
+    return { success: false, message: "Your profile is suspended. Contact support for assistance." };
   }
 
   const { error } = await supabase

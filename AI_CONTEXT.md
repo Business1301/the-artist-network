@@ -688,9 +688,45 @@ All integration checks executed with 100% pass rate:
   - `lib/data/artists.ts`: Relaxed query timeout threshold from `4000ms` to `8000ms` to accommodate remote database network latency and cold-starts, and converted fallback logging to `console.warn` to prevent Next.js Turbopack development overlay popups.
 - **Verification:** TypeScript: 0 errors, ESLint: 0 errors, Production build: 16/16 routes compiled cleanly. Git commit `f81542e`.
 
-### 12.7 Next Steps & Phase Boundaries
+### 12.7 Artist Self-Publishing & Verification-Based Ranking Architecture
 
-- **Phase 4.5 Stage 3:** Complete. Test accounts are ready, verified, and UI is fully synchronized across all client, auth, and admin interfaces.
+- **Objective:** Convert platform from an admin-gated publication bottleneck to an open artist marketplace where artists self-publish immediately upon completing mandatory profile fields, while admins maintain content moderation via suspension/reinstatement and quality curation via verified badges.
+- **Architectural & Security Controls Implemented:**
+  1. **New Profile Statuses & Legacy Compatibility:**
+     - Active statuses: `draft`, `published`, `suspended`.
+     - Legacy statuses preserved in database CHECK constraint: `pending_review`, `rejected`. No existing rows were auto-published or altered; artists deliberately self-publish or revert to draft.
+  2. **Total Suspension Freeze (Multi-Layer Enforcement):**
+     - **Database Trigger Invariant 0:** Added to `enforce_artist_profile_protection()`. If `OLD.profile_status = 'suspended'` and caller is not admin, ALL column updates are rejected (`42501`).
+     - **Portfolio RLS Policies:** `INSERT`, `UPDATE`, and `DELETE` on `public.portfolio_items` now strictly check `NOT EXISTS (SELECT 1 FROM public.artist_profiles WHERE id = auth.uid() AND profile_status = 'suspended')`.
+     - **Server Actions & UI:** Form inputs wrapped in `<fieldset disabled={isSuspended}>`, portfolio controls disabled, and server actions fail-closed if suspended.
+  3. **Database-Level Publication Validation Trigger:**
+     - Created `enforce_publication_requirements()` trigger firing on `INSERT` or `UPDATE OF profile_status`.
+     - When transitioning into `published`, strictly validates `stage_name`, `category`, `city`, `bio` (≥30 chars), and `starting_price` (>0). Rejects API-level bypass attempts with `23514`.
+  4. **Server Actions Replaced & Extended:**
+     - Added `publishProfile()`: Validates completeness and publishes profile.
+     - Added `unpublishProfile()`: Takes profile back to draft voluntarily.
+     - Added `suspendArtistProfile(artistId, reason)`: Calls moderation RPC with mandatory reason, revokes verified badge, sets `suspended`, logs `suspend_profile`.
+     - Added `reinstateArtistProfile(artistId)`: Calls moderation RPC, sets `published`, clears notes, logs `reinstate_profile`.
+     - Kept `approveArtistApplication()` and `rejectArtistApplication()` for RPC backward compatibility.
+  5. **Discovery Ranking & User Sorting:**
+     - Verified and unverified published artists both appear on Discover Artists (`/artists`).
+     - Default "Recommended" sort places verified artists first (`is_verified DESC, created_at DESC`).
+     - Explicit user-selected sorts (`price_low_high`, `price_high_low`, `newest`) are strictly respected without verification override.
+  6. **UI Harmonization:**
+     - Artist Dashboard: Displays active/suspended/legacy status badges and prompts.
+     - Profile Editor: Displays "Publish Profile" or "Unpublish", with total freeze banner when suspended.
+     - Admin Applications: Tabs for `Published`, `Suspended`, `Pending Review` (legacy), and `All`. Modal supports Suspend, Reinstate, and Verification.
+     - Admin Overview: "Suspended Profiles" metric card replaces "Pending Applications".
+     - Audit Log Viewer: Added badges for `suspend_profile` and `reinstate_profile`.
+  7. **Future Booking Calendar Requirement (Documented for Future Phase):**
+     - Approved product requirement for an artist gig calendar: manual external bookings, blocked dates, private booking details, availability/overlap warnings, and future platform booking integration. (Not yet implemented; Phase 5 remains blocked).
+- **Migration SQL File:** Prepared at [`supabase/migrations/20261112_self_publish.sql`](file:///c:/Users/mohit/OneDrive/Desktop/The Artist Network/supabase/migrations/20261112_self_publish.sql) for manual execution by platform owner in Supabase Dashboard SQL Editor.
+- **Verification:** TypeScript: 0 errors, ESLint: 0 errors, Production build: 16/16 routes compiled cleanly.
+
+### 12.8 Next Steps & Phase Boundaries
+
+- **Phase 4.5 Stage 3:** Self-publishing code, security triggers, RLS policies, admin controls, and UI updates complete.
+- **Migration Execution:** Awaiting owner execution of `20261112_self_publish.sql` in Supabase SQL editor.
 - **Phase 5:** NOT STARTED (Strict rule: Phase 5 remains blocked until explicit user sign-off).
 
 

@@ -6,6 +6,8 @@ import {
   ArtistApplication,
   approveArtistApplication,
   rejectArtistApplication,
+  suspendArtistProfile,
+  reinstateArtistProfile,
   verifyArtistApplication,
   unverifyArtistApplication,
   getApplicationDetails,
@@ -21,14 +23,14 @@ export default function ApplicationsManager({
   initialSelectedId,
 }: ApplicationsManagerProps) {
   const [applications, setApplications] = useState<ArtistApplication[]>(initialApplications);
-  const [filter, setFilter] = useState<"pending_review" | "published" | "rejected" | "all">("pending_review");
+  const [filter, setFilter] = useState<"published" | "suspended" | "pending_review" | "draft" | "all">("published");
   const [selectedApp, setSelectedApp] = useState<ArtistApplication | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
   // Moderation state
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState("");
+  const [showSuspendModal, setShowSuspendModal] = useState(false);
+  const [suspensionReason, setSuspensionReason] = useState("");
   const [actionNotice, setActionNotice] = useState<{ message: string; error?: boolean } | null>(null);
 
   // Filter applications list
@@ -41,8 +43,8 @@ export default function ApplicationsManager({
     setSelectedApp(app);
     setIsLoadingDetails(true);
     setActionNotice(null);
-    setShowRejectModal(false);
-    setRejectionReason("");
+    setShowSuspendModal(false);
+    setSuspensionReason("");
 
     try {
       const detailed = await getApplicationDetails(app.id);
@@ -73,6 +75,67 @@ export default function ApplicationsManager({
     };
   }, [initialSelectedId]);
 
+  const handleSuspend = async () => {
+    if (!selectedApp) return;
+    if (!suspensionReason.trim() || suspensionReason.trim().length < 5) {
+      setActionNotice({
+        message: "Please provide a specific suspension reason of at least 5 characters.",
+        error: true,
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    setActionNotice(null);
+
+    const res = await suspendArtistProfile(selectedApp.id, suspensionReason.trim());
+    setIsProcessing(false);
+
+    if (res.success) {
+      setActionNotice({ message: res.message });
+      setShowSuspendModal(false);
+      setApplications((prev) =>
+        prev.map((a) =>
+          a.id === selectedApp.id
+            ? { ...a, profile_status: "suspended", rejection_reason: suspensionReason.trim(), is_verified: false }
+            : a
+        )
+      );
+      setSelectedApp((prev) =>
+        prev
+          ? { ...prev, profile_status: "suspended", rejection_reason: suspensionReason.trim(), is_verified: false }
+          : null
+      );
+    } else {
+      setActionNotice({ message: res.message, error: true });
+    }
+  };
+
+  const handleReinstate = async () => {
+    if (!selectedApp) return;
+    setIsProcessing(true);
+    setActionNotice(null);
+
+    const res = await reinstateArtistProfile(selectedApp.id);
+    setIsProcessing(false);
+
+    if (res.success) {
+      setActionNotice({ message: res.message });
+      setApplications((prev) =>
+        prev.map((a) =>
+          a.id === selectedApp.id
+            ? { ...a, profile_status: "published", rejection_reason: null }
+            : a
+        )
+      );
+      setSelectedApp((prev) =>
+        prev ? { ...prev, profile_status: "published", rejection_reason: null } : null
+      );
+    } else {
+      setActionNotice({ message: res.message, error: true });
+    }
+  };
+
   const handleApprove = async () => {
     if (!selectedApp) return;
     setIsProcessing(true);
@@ -95,7 +158,7 @@ export default function ApplicationsManager({
 
   const handleReject = async () => {
     if (!selectedApp) return;
-    if (!rejectionReason.trim() || rejectionReason.trim().length < 5) {
+    if (!suspensionReason.trim() || suspensionReason.trim().length < 5) {
       setActionNotice({
         message: "Please provide a specific rejection reason of at least 5 characters.",
         error: true,
@@ -106,22 +169,22 @@ export default function ApplicationsManager({
     setIsProcessing(true);
     setActionNotice(null);
 
-    const res = await rejectArtistApplication(selectedApp.id, rejectionReason.trim());
+    const res = await rejectArtistApplication(selectedApp.id, suspensionReason.trim());
     setIsProcessing(false);
 
     if (res.success) {
       setActionNotice({ message: res.message });
-      setShowRejectModal(false);
+      setShowSuspendModal(false);
       setApplications((prev) =>
         prev.map((a) =>
           a.id === selectedApp.id
-            ? { ...a, profile_status: "rejected", rejection_reason: rejectionReason.trim(), is_verified: false }
+            ? { ...a, profile_status: "rejected", rejection_reason: suspensionReason.trim(), is_verified: false }
             : a
         )
       );
       setSelectedApp((prev) =>
         prev
-          ? { ...prev, profile_status: "rejected", rejection_reason: rejectionReason.trim(), is_verified: false }
+          ? { ...prev, profile_status: "rejected", rejection_reason: suspensionReason.trim(), is_verified: false }
           : null
       );
     } else {
@@ -173,17 +236,6 @@ export default function ApplicationsManager({
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 pb-4">
         <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-200">
           <button
-            onClick={() => setFilter("pending_review")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              filter === "pending_review"
-                ? "bg-amber-50 text-amber-700 border border-amber-200 shadow-2xs font-bold"
-                : "text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            Pending Review ({applications.filter((a) => a.profile_status === "pending_review").length})
-          </button>
-
-          <button
             onClick={() => setFilter("published")}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
               filter === "published"
@@ -195,15 +247,28 @@ export default function ApplicationsManager({
           </button>
 
           <button
-            onClick={() => setFilter("rejected")}
+            onClick={() => setFilter("suspended")}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              filter === "rejected"
+              filter === "suspended"
                 ? "bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs font-bold"
                 : "text-gray-600 hover:text-gray-900"
             }`}
           >
-            Rejected ({applications.filter((a) => a.profile_status === "rejected").length})
+            Suspended ({applications.filter((a) => a.profile_status === "suspended").length})
           </button>
+
+          {applications.some((a) => a.profile_status === "pending_review") && (
+            <button
+              onClick={() => setFilter("pending_review")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                filter === "pending_review"
+                  ? "bg-amber-50 text-amber-700 border border-amber-200 shadow-2xs font-bold"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              Pending Review ({applications.filter((a) => a.profile_status === "pending_review").length})
+            </button>
+          )}
 
           <button
             onClick={() => setFilter("all")}
@@ -218,7 +283,7 @@ export default function ApplicationsManager({
         </div>
 
         <div className="text-xs text-gray-500">
-          Showing <span className="font-bold text-gray-900">{filteredApps.length}</span> application(s)
+          Showing <span className="font-bold text-gray-900">{filteredApps.length}</span> artist profile(s)
         </div>
       </div>
 
@@ -253,8 +318,12 @@ export default function ApplicationsManager({
                   const statusBadge =
                     app.profile_status === "published"
                       ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : app.profile_status === "suspended"
+                      ? "bg-rose-50 text-rose-700 border-rose-200"
                       : app.profile_status === "rejected"
                       ? "bg-rose-50 text-rose-700 border-rose-200"
+                      : app.profile_status === "draft"
+                      ? "bg-gray-100 text-gray-700 border-gray-200"
                       : "bg-amber-50 text-amber-700 border-amber-200";
 
                   return (
@@ -503,35 +572,45 @@ export default function ApplicationsManager({
                 )}
               </div>
 
-              {/* Reject Reason Form (if toggled) */}
-              {showRejectModal && (
+              {/* Suspend / Reject Reason Form (if toggled) */}
+              {showSuspendModal && (
                 <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 space-y-3">
-                  <h4 className="font-bold text-sm text-rose-800">Mandatory Rejection Reason</h4>
+                  <h4 className="font-bold text-sm text-rose-800">
+                    {selectedApp.profile_status === "published"
+                      ? "Mandatory Profile Suspension Reason"
+                      : "Mandatory Moderation Reason"}
+                  </h4>
                   <p className="text-gray-600 text-[11px]">
-                    Explain clearly to the artist what needs to be improved or completed before resubmitting.
+                    {selectedApp.profile_status === "published"
+                      ? "Explain clearly why this published profile is being suspended. The profile will immediately be removed from public discovery and completely frozen."
+                      : "Explain clearly to the artist why this application is not accepted."}
                   </p>
                   <textarea
-                    value={rejectionReason}
-                    onChange={(e) => setRejectionReason(e.target.value)}
-                    placeholder="e.g. Please provide at least two portfolio audio samples and a clearer stage photo."
+                    value={suspensionReason}
+                    onChange={(e) => setSuspensionReason(e.target.value)}
+                    placeholder="e.g. Terms of service violation: inappropriate media uploaded or misrepresenting identity."
                     rows={3}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-rose-300 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-rose-500"
                   />
                   <div className="flex justify-end gap-2">
                     <button
                       type="button"
-                      onClick={() => setShowRejectModal(false)}
+                      onClick={() => setShowSuspendModal(false)}
                       className="px-3 py-1.5 rounded-xl border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-gray-100"
                     >
                       Cancel
                     </button>
                     <button
                       type="button"
-                      onClick={handleReject}
+                      onClick={selectedApp.profile_status === "published" ? handleSuspend : handleReject}
                       disabled={isProcessing}
                       className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs disabled:opacity-50"
                     >
-                      {isProcessing ? "Rejecting..." : "Confirm Rejection"}
+                      {isProcessing
+                        ? "Processing..."
+                        : selectedApp.profile_status === "published"
+                        ? "Confirm Suspension"
+                        : "Confirm Rejection"}
                     </button>
                   </div>
                 </div>
@@ -566,25 +645,46 @@ export default function ApplicationsManager({
               </div>
 
               <div className="flex items-center gap-2">
-                {/* Approve & Reject buttons */}
-                {selectedApp.profile_status !== "published" && (
+                {/* Suspend button for published profiles */}
+                {selectedApp.profile_status === "published" && (
                   <button
-                    onClick={() => setShowRejectModal(true)}
-                    disabled={isProcessing || showRejectModal}
+                    onClick={() => setShowSuspendModal(true)}
+                    disabled={isProcessing || showSuspendModal}
                     className="px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-xs transition-colors disabled:opacity-50"
                   >
-                    Reject Application
+                    🚫 Suspend Profile
                   </button>
                 )}
 
-                {selectedApp.profile_status !== "published" && (
+                {/* Reinstate button for suspended profiles */}
+                {selectedApp.profile_status === "suspended" && (
                   <button
-                    onClick={handleApprove}
+                    onClick={handleReinstate}
                     disabled={isProcessing}
-                    className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors shadow-sm disabled:opacity-50"
+                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition-colors disabled:opacity-50 shadow-sm"
                   >
-                    {isProcessing ? "Approving..." : "Approve & Publish"}
+                    {isProcessing ? "Reinstating..." : "🔄 Reinstate Profile"}
                   </button>
+                )}
+
+                {/* Legacy Pending Review buttons */}
+                {selectedApp.profile_status === "pending_review" && (
+                  <>
+                    <button
+                      onClick={() => setShowSuspendModal(true)}
+                      disabled={isProcessing || showSuspendModal}
+                      className="px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold text-xs transition-colors disabled:opacity-50"
+                    >
+                      Reject
+                    </button>
+                    <button
+                      onClick={handleApprove}
+                      disabled={isProcessing}
+                      className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors shadow-sm disabled:opacity-50"
+                    >
+                      {isProcessing ? "Approving..." : "Approve & Publish"}
+                    </button>
+                  </>
                 )}
 
                 <button

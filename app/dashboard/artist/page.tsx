@@ -223,46 +223,90 @@ export default function ArtistDashboardPage() {
               </div>
             </div>
           ) : (
-            /* REAL ARTIST PROFILE HEADER CARD */
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 shadow-sm mb-8">
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center text-white font-extrabold text-2xl shadow-md flex-shrink-0">
-                    {profile.profile_image_url ? (
-                      <img
-                        src={profile.profile_image_url}
-                        alt={profile.stage_name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span>{profile.stage_name.slice(0, 2).toUpperCase()}</span>
-                    )}
-                  </div>
+            <>
+              {/* Suspended Alert Banner */}
+              {profile.profile_status === "suspended" && (
+                <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 shadow-sm flex items-start gap-3">
+                  <span className="text-xl">🚫</span>
                   <div>
-                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900">
-                        {profile.stage_name}
-                      </h1>
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${
-                          profile.profile_status === "published"
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    <h3 className="text-sm font-bold text-rose-900">Your artist profile has been suspended</h3>
+                    <p className="text-xs text-rose-700 mt-0.5">
+                      {profile.rejection_reason
+                        ? `Administrative reason: "${profile.rejection_reason}"`
+                        : "Your profile has been suspended due to a moderation review. Your public profile and portfolio edits are currently frozen."}
+                    </p>
+                    <p className="text-xs text-rose-600 mt-2 font-semibold">
+                      Please contact platform administration if you believe this was in error.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Legacy Pending Review Banner */}
+              {profile.profile_status === "pending_review" && (
+                <div className="mb-6 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 shadow-sm flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <span className="text-xl">⏳</span>
+                    <div>
+                      <h3 className="text-sm font-bold text-amber-900">Platform Update: Admin Approval No Longer Required!</h3>
+                      <p className="text-xs text-amber-700 mt-0.5">
+                        The Artist Network is now an open marketplace. You can publish your profile immediately to go live.
+                      </p>
+                    </div>
+                  </div>
+                  <Link
+                    href="/dashboard/artist/edit"
+                    className="shrink-0 px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-sm transition-colors"
+                  >
+                    Publish Now &rarr;
+                  </Link>
+                </div>
+              )}
+
+              {/* REAL ARTIST PROFILE HEADER CARD */}
+              <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 shadow-sm mb-8">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                  
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center text-white font-extrabold text-2xl shadow-md flex-shrink-0">
+                      {profile.profile_image_url ? (
+                        <img
+                          src={profile.profile_image_url}
+                          alt={profile.stage_name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span>{profile.stage_name.slice(0, 2).toUpperCase()}</span>
+                      )}
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <h1 className="text-xl sm:text-2xl font-extrabold text-gray-900">
+                          {profile.stage_name}
+                        </h1>
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${
+                            profile.profile_status === "published"
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : profile.profile_status === "suspended"
+                              ? "bg-rose-50 text-rose-700 border border-rose-200"
+                              : profile.profile_status === "pending_review"
+                              ? "bg-amber-50 text-amber-700 border border-amber-200"
+                              : profile.profile_status === "rejected"
+                              ? "bg-rose-50 text-rose-700 border border-rose-200"
+                              : "bg-gray-100 text-gray-700 border border-gray-200"
+                          }`}
+                        >
+                          {profile.profile_status === "published"
+                            ? "● Live on Marketplace"
+                            : profile.profile_status === "suspended"
+                            ? "🚫 Suspended by Admin"
                             : profile.profile_status === "pending_review"
-                            ? "bg-amber-50 text-amber-700 border border-amber-200"
+                            ? "⏳ In Review"
                             : profile.profile_status === "rejected"
-                            ? "bg-rose-50 text-rose-700 border border-rose-200"
-                            : "bg-gray-100 text-gray-700 border border-gray-200"
-                        }`}
-                      >
-                        {profile.profile_status === "published"
-                          ? "● Approved & Live"
-                          : profile.profile_status === "pending_review"
-                          ? "⏳ Under Review"
-                          : profile.profile_status === "rejected"
-                          ? "⚠️ Changes Needed"
-                          : "📝 Draft in Progress"}
-                      </span>
+                            ? "⚠️ Changes Needed"
+                            : "📝 Draft in Progress"}
+                        </span>
                       {profile.is_verified && (
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
                           ✓ Verified Artist
@@ -315,6 +359,7 @@ export default function ArtistDashboardPage() {
                 </p>
               </div>
             </div>
+            </>
           )}
 
           {/* Analytics Snapshot KPI Cards */}

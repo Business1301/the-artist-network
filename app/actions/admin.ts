@@ -11,7 +11,7 @@ export interface AdminActionResult {
 }
 
 export interface AdminMetrics {
-  pendingApplications: number;
+  suspendedProfiles: number;
   publishedArtists: number;
   verifiedArtists: number;
   totalBusinesses: number;
@@ -273,6 +273,96 @@ export async function unverifyArtistApplication(
 }
 
 /**
+ * Suspend an artist profile with a mandatory reason.
+ * Recorded atomically in admin_audit_logs via admin_moderate_artist_profile RPC.
+ * Suspended profiles are totally frozen — artist cannot edit anything.
+ */
+export async function suspendArtistProfile(
+  artistId: string,
+  suspensionReason: string
+): Promise<AdminActionResult> {
+  await requireAdmin();
+
+  if (!isValidUuid(artistId)) {
+    return { success: false, message: "Invalid artist ID format." };
+  }
+
+  const trimmedReason = suspensionReason?.trim();
+  if (!trimmedReason || trimmedReason.length < 5) {
+    return {
+      success: false,
+      message: "A specific suspension reason (at least 5 characters) is required.",
+    };
+  }
+
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.rpc("admin_moderate_artist_profile", {
+    p_artist_id: artistId.trim(),
+    p_action: "suspend",
+    p_rejection_reason: trimmedReason,
+  });
+
+  if (error) {
+    return {
+      success: false,
+      message: error.message || "Failed to suspend artist profile.",
+    };
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/applications");
+  revalidatePath("/admin/audit-logs");
+  revalidatePath("/artists");
+
+  return {
+    success: true,
+    message: "Artist profile suspended with audit record.",
+    data,
+  };
+}
+
+/**
+ * Reinstate a previously suspended artist profile.
+ * Recorded atomically in admin_audit_logs via admin_moderate_artist_profile RPC.
+ */
+export async function reinstateArtistProfile(
+  artistId: string
+): Promise<AdminActionResult> {
+  await requireAdmin();
+
+  if (!isValidUuid(artistId)) {
+    return { success: false, message: "Invalid artist ID format." };
+  }
+
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.rpc("admin_moderate_artist_profile", {
+    p_artist_id: artistId.trim(),
+    p_action: "reinstate",
+    p_rejection_reason: null,
+  });
+
+  if (error) {
+    return {
+      success: false,
+      message: error.message || "Failed to reinstate artist profile.",
+    };
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/applications");
+  revalidatePath("/admin/audit-logs");
+  revalidatePath("/artists");
+
+  return {
+    success: true,
+    message: "Artist profile reinstated and published.",
+    data,
+  };
+}
+
+/**
  * Retrieve real platform metrics directly from the database.
  * Never fabricates numbers or silently masks database errors.
  */
@@ -283,17 +373,17 @@ export async function getAdminMetrics(): Promise<AdminMetrics> {
   const { data: { user: currentUser } } = await supabase.auth.getUser();
   console.log("[ADMIN DEBUG] getAdminMetrics currentUser:", currentUser?.id, currentUser?.email);
 
-  // 1. Pending reviews count
-  const { count: pendingCount, error: pendingErr } = await supabase
+  // 1. Suspended profiles count
+  const { count: suspendedCount, error: suspendedErr } = await supabase
     .from("artist_profiles")
     .select("*", { count: "exact", head: true })
-    .eq("profile_status", "pending_review");
+    .eq("profile_status", "suspended");
 
-  if (pendingErr) {
-    throw new Error(`Database error querying pending applications: ${pendingErr.message}`);
+  if (suspendedErr) {
+    throw new Error(`Database error querying suspended profiles: ${suspendedErr.message}`);
   }
 
-  console.log("[ADMIN DEBUG] pendingCount from DB:", pendingCount);
+  console.log("[ADMIN DEBUG] suspendedCount from DB:", suspendedCount);
 
   // 2. Published artists count
   const { count: publishedCount, error: publishedErr } = await supabase
@@ -326,7 +416,7 @@ export async function getAdminMetrics(): Promise<AdminMetrics> {
   }
 
   return {
-    pendingApplications: pendingCount ?? 0,
+    suspendedProfiles: suspendedCount ?? 0,
     publishedArtists: publishedCount ?? 0,
     verifiedArtists: verifiedCount ?? 0,
     totalBusinesses: businessCount ?? 0,

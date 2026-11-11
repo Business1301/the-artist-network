@@ -13,12 +13,14 @@ interface PortfolioManagerProps {
   userId: string;
   items: PortfolioItemData[];
   onItemsChange: (items: PortfolioItemData[]) => void;
+  disabled?: boolean;
 }
 
 export default function PortfolioManager({
   userId,
   items,
   onItemsChange,
+  disabled = false,
 }: PortfolioManagerProps) {
   const [isPending, startTransition] = useTransition();
   const [isAdding, setIsAdding] = useState(false);
@@ -187,7 +189,7 @@ export default function PortfolioManager({
           </p>
         </div>
 
-        {!isAdding && (
+        {!isAdding && !disabled && (
           <button
             type="button"
             onClick={() => setIsAdding(true)}
@@ -197,6 +199,13 @@ export default function PortfolioManager({
           </button>
         )}
       </div>
+
+      {/* Disabled / Suspended Banner */}
+      {disabled && (
+        <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium">
+          🚫 Portfolio uploads and edits are frozen while your profile is suspended.
+        </div>
+      )}
 
       {/* Status banner */}
       {statusMessage && (
@@ -429,13 +438,15 @@ export default function PortfolioManager({
                   </div>
 
                   {/* Delete */}
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteItem(item.id)}
-                    className="text-xs text-rose-600 hover:text-rose-700 font-semibold"
-                  >
-                    Delete
-                  </button>
+                  {!disabled && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteItem(item.id)}
+                      className="text-xs text-rose-600 hover:text-rose-700 font-semibold"
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
