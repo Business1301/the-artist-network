@@ -61,6 +61,26 @@ const POPULAR_LANGUAGES = [
   "Bengali",
 ];
 
+const DEFAULT_TECHNICAL_REQUIREMENTS = [
+  "PA system: Speakers, amplifiers, and mixers for sound.",
+  "Monitors: Stage monitors for band members.",
+  "Microphones: For vocals and instruments (with stands).",
+  "Instruments: Drums set required on stage.",
+  "Power supply: Adequate outlets and extension cords.",
+  "Air travel to venue: Flight arrangements for the band and crew.",
+];
+
+const COMMON_RIDER_SUGGESTIONS = [
+  "PA system (Speakers, amplifiers, mixer)",
+  "Stage monitors for band members",
+  "Vocal microphones with boom stands",
+  "Acoustic drum kit on stage",
+  "16A clean power outlets on stage",
+  "Dedicated green room with mirror",
+  "Flight / travel arrangements for crew",
+  "Hotel stay & local airport transfers",
+];
+
 export default function ArtistProfileEditorPage() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -87,6 +107,8 @@ export default function ArtistProfileEditorPage() {
   const [genres, setGenres] = useState<string[]>([]);
   const [specialities, setSpecialities] = useState<string[]>([]);
   const [languages, setLanguages] = useState<string[]>(["Hindi", "English"]);
+  const [technicalRequirements, setTechnicalRequirements] = useState<string[]>(DEFAULT_TECHNICAL_REQUIREMENTS);
+  const [customRequirement, setCustomRequirement] = useState("");
   const [profileImageUrl, setProfileImageUrl] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [instagramUrl, setInstagramUrl] = useState("");
@@ -135,6 +157,11 @@ export default function ArtistProfileEditorPage() {
         setGenres(p.genres || []);
         setSpecialities(p.specialities || []);
         setLanguages(p.languages || ["Hindi", "English"]);
+        if (p.technical_requirements !== undefined && p.technical_requirements !== null) {
+          setTechnicalRequirements(p.technical_requirements);
+        } else {
+          setTechnicalRequirements(DEFAULT_TECHNICAL_REQUIREMENTS);
+        }
         setProfileImageUrl(p.profile_image_url || "");
         setCoverImageUrl(p.cover_image_url || "");
         setInstagramUrl(p.instagram_url || "");
@@ -254,6 +281,26 @@ export default function ArtistProfileEditorPage() {
     }
   };
 
+  const handleAddRequirement = (text?: string) => {
+    const val = (text || customRequirement).trim();
+    if (val && !technicalRequirements.includes(val)) {
+      setTechnicalRequirements([...technicalRequirements, val]);
+      if (!text) setCustomRequirement("");
+    }
+  };
+
+  const handleRemoveRequirement = (index: number) => {
+    setTechnicalRequirements(technicalRequirements.filter((_, i) => i !== index));
+  };
+
+  const handleClearAllRequirements = () => {
+    setTechnicalRequirements([]);
+  };
+
+  const handleResetDefaultRequirements = () => {
+    setTechnicalRequirements([...DEFAULT_TECHNICAL_REQUIREMENTS]);
+  };
+
   // Save Draft
   const handleSaveDraft = () => {
     setStatusMessage(null);
@@ -271,6 +318,7 @@ export default function ArtistProfileEditorPage() {
         genres,
         specialities,
         languages,
+        technical_requirements: technicalRequirements,
         profile_image_url: profileImageUrl,
         cover_image_url: coverImageUrl,
         instagram_url: instagramUrl,
@@ -310,6 +358,7 @@ export default function ArtistProfileEditorPage() {
         genres,
         specialities,
         languages,
+        technical_requirements: technicalRequirements,
         profile_image_url: profileImageUrl,
         cover_image_url: coverImageUrl,
         instagram_url: instagramUrl,
@@ -880,10 +929,133 @@ export default function ArtistProfileEditorPage() {
               </div>
             </div>
 
-            {/* SECTION 5: Social Media & Links */}
+            {/* SECTION 5: Stage Requirements & Terms (Technical Rider) */}
+            <div className="bg-gray-900/70 border border-gray-800 rounded-2xl p-6 sm:p-8 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-1">
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <span>5.</span> Stage Requirements &amp; Terms (Technical Rider)
+                </h2>
+                <div className="flex items-center gap-2">
+                  {technicalRequirements.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={handleClearAllRequirements}
+                      className="text-[11px] text-rose-400 hover:text-rose-300 font-semibold underline"
+                    >
+                      Remove All
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleResetDefaultRequirements}
+                      className="text-[11px] text-purple-400 hover:text-purple-300 font-semibold underline"
+                    >
+                      Restore Standard Defaults
+                    </button>
+                  )}
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 mb-6">
+                Specify what sound equipment, gear, power, or travel arrangements you require from venues. You can add custom items, remove unwanted items with ✕, or remove all requirements if you have none.
+              </p>
+
+              {/* Active Requirements List */}
+              <div className="space-y-2 mb-6">
+                {technicalRequirements.length === 0 ? (
+                  <div className="p-4 rounded-xl bg-gray-950 border border-dashed border-gray-800 text-center text-xs text-gray-500">
+                    No technical requirements specified. Your public profile will omit the requirements section.
+                  </div>
+                ) : (
+                  technicalRequirements.map((req, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between gap-3 p-3 rounded-xl bg-gray-950 border border-gray-800/90 hover:border-gray-700 transition-colors"
+                    >
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <span className="text-purple-400 font-bold text-xs mt-0.5">•</span>
+                        <span className="text-xs text-gray-200 leading-relaxed break-words">{req}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveRequirement(idx)}
+                        className="shrink-0 w-7 h-7 rounded-lg bg-gray-900 hover:bg-rose-950/60 border border-gray-800 hover:border-rose-800/60 text-gray-400 hover:text-rose-300 text-xs font-bold flex items-center justify-center transition-colors"
+                        title="Remove this requirement"
+                        aria-label={`Remove requirement: ${req}`}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Add Custom Requirement Input */}
+              <div className="mb-6">
+                <label className="block text-xs font-semibold text-gray-300 mb-2">
+                  Add Custom Requirement
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={customRequirement}
+                    onChange={(e) => setCustomRequirement(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddRequirement();
+                      }
+                    }}
+                    placeholder="e.g. 2 cordless Shure microphones, keyboard stand, 16A power socket..."
+                    className="flex-1 px-3.5 py-2.5 rounded-xl bg-gray-950 border border-gray-800 text-xs text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleAddRequirement()}
+                    disabled={!customRequirement.trim()}
+                    className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-xs font-bold text-white rounded-xl transition-colors shadow-sm"
+                  >
+                    + Add
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Add Suggestions */}
+              <div>
+                <span className="block text-[11px] font-semibold text-gray-400 mb-2 uppercase tracking-wider">
+                  Quick Add Common Requirements:
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {COMMON_RIDER_SUGGESTIONS.map((suggestion) => {
+                    const isAdded = technicalRequirements.includes(suggestion);
+                    return (
+                      <button
+                        type="button"
+                        key={suggestion}
+                        onClick={() => {
+                          if (isAdded) {
+                            setTechnicalRequirements(technicalRequirements.filter((r) => r !== suggestion));
+                          } else {
+                            handleAddRequirement(suggestion);
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                          isAdded
+                            ? "bg-purple-600/30 border border-purple-500/50 text-purple-200"
+                            : "bg-gray-950 border border-gray-800 text-gray-400 hover:text-white hover:border-gray-700"
+                        }`}
+                      >
+                        {isAdded ? `✓ ${suggestion} (Added)` : `+ ${suggestion}`}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* SECTION 6: Social Media & Links */}
             <div className="bg-gray-900/70 border border-gray-800 rounded-2xl p-6 sm:p-8 shadow-sm">
               <h2 className="text-base font-bold text-white mb-1 flex items-center gap-2">
-                <span>5.</span> Social Media &amp; Web Links
+                <span>6.</span> Social Media &amp; Web Links
               </h2>
               <p className="text-xs text-gray-400 mb-6">
                 Link your verified social media and streaming accounts.
@@ -944,7 +1116,7 @@ export default function ArtistProfileEditorPage() {
               </div>
             </div>
 
-            {/* SECTION 6: Portfolio Management */}
+            {/* SECTION 7: Portfolio Management */}
             {userId && (
               <PortfolioManager
                 userId={userId}

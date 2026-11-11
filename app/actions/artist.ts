@@ -16,6 +16,7 @@ export interface ArtistProfileData {
   specialities: string[];
   languages: string[];
   performance_types: string[];
+  technical_requirements?: string[];
   starting_price: number | null;
   pricing_unit: "per hour" | "per performance" | "per event";
   profile_image_url: string | null;
@@ -140,6 +141,7 @@ export async function saveArtistProfile(
     specialities: formData.specialities || [],
     languages: formData.languages || [],
     performance_types: formData.performance_types || [],
+    technical_requirements: formData.technical_requirements || [],
     starting_price: formData.starting_price ? Number(formData.starting_price) : null,
     pricing_unit: formData.pricing_unit || "per performance",
     profile_image_url: formData.profile_image_url || null,
@@ -152,11 +154,24 @@ export async function saveArtistProfile(
     profile_status: formData.profile_status === "pending_review" ? "pending_review" : "draft",
   };
 
-  const { data: updated, error } = await supabase
+  let { data: updated, error } = await supabase
     .from("artist_profiles")
     .upsert(payload, { onConflict: "id" })
     .select()
     .single();
+
+  // Graceful fallback if technical_requirements column has not been added to Supabase yet
+  if (error && error.message?.includes("technical_requirements")) {
+    const fallbackPayload = { ...payload };
+    delete (fallbackPayload as { technical_requirements?: unknown }).technical_requirements;
+    const retry = await supabase
+      .from("artist_profiles")
+      .upsert(fallbackPayload, { onConflict: "id" })
+      .select()
+      .single();
+    updated = retry.data;
+    error = retry.error;
+  }
 
   if (error) {
     return { success: false, message: error.message };

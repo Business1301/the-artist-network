@@ -615,5 +615,49 @@ Two dedicated test accounts have been configured adhering strictly to RFC 2606 r
 - Passwords are **never** committed to Git, logged to console, written into markdown documentation, or exposed in final reports.
 
 **Account Provisioning Status:**
-- Automated provisioning script prepared in scratch environment: `provision_test_accounts.mjs`.
-- Actual API account creation is pending the project unpause in Supabase Dashboard.
+- Automated provisioning script executed successfully against active Supabase project.
+- **Artist Account:** `artist.test@theartistnetwork.example` (Auth ID: `688c7416-7d71-44cf-ba09-b519fdf26f15`, Profile Role: `'artist'`) ✅
+- **Business Account:** `business.test@theartistnetwork.example` (Auth ID: `b4db2908-5454-43e6-81a4-c80ef02d07f5`, Profile Role: `'business'`) ✅
+- Both accounts can sign in via Supabase Auth and have valid `public.profiles` entries.
+
+### 12.4 Phase 4.5 Stage 3 — Integration Testing Results
+
+All integration checks executed with 100% pass rate:
+1. **Artist Sign-In & Profile Verification:** PASS ✅
+   - Successful auth session token exchange.
+   - `public.profiles` read confirms `role = 'artist'`, `full_name = 'Demo Test Artist'`.
+2. **Business Sign-In & Profile Verification:** PASS ✅
+   - Successful auth session token exchange.
+   - `public.profiles` read confirms `role = 'business'`, `full_name = 'Venue Manager'`.
+3. **Cross-Role Boundary Enforcement:** PASS ✅
+   - Artist accessing `requireArtist()` → Granted.
+   - Artist accessing `requireBusiness()` → Correctly redirected to `/dashboard/artist`.
+   - Artist accessing `requireAdmin()` → Correctly redirected to `/dashboard/artist`.
+   - Business accessing `requireBusiness()` → Granted.
+   - Business accessing `requireArtist()` → Correctly redirected to `/dashboard/restaurant`.
+   - Business accessing `requireAdmin()` → Correctly redirected to `/dashboard/restaurant`.
+4. **Open Redirect & Path Traversal Defense:** PASS ✅
+   - `//evil.com` safely sanitized to role dashboard.
+   - `/\evil.com` safely sanitized to role dashboard.
+   - `/admin` and `/admin/*` requested by artist/business cleanly redirected to authorized dashboard.
+   - `/admin/*` requested by admin preserved.
+   - Legitimate internal paths (e.g. `/artists`) preserved.
+5. **Server Route Protection (Unauthenticated):** PASS ✅
+   - `/admin` → HTTP 307 redirect to `/login?redirectTo=/admin`.
+   - `/dashboard/artist` → HTTP 307 redirect to `/login?redirectTo=%2Fdashboard%2Fartist`.
+   - `/dashboard/restaurant` → HTTP 307 redirect to `/login?redirectTo=%2Fdashboard%2Frestaurant`.
+   - `/artists` (public) → HTTP 200 OK.
+6. **Next.js 16 Partial Prerendering & Date.now() Stability:** PASS ✅
+   - Added `await connection()` to `app/artists/page.tsx` and `app/artists/[slug]/page.tsx`.
+   - Clean dynamic request-time rendering (`ƒ /artists`), 0 prerendering blocking errors.
+7. **Custom Technical Rider & Stage Requirements (Section 5):** PASS ✅
+   - Database migration `supabase/migrations/20261112_artist_technical_requirements.sql` (`technical_requirements TEXT[]`).
+   - Profile editor (`/dashboard/artist/edit`) equipped with dynamic add/remove, custom input, quick presets, and clear-all.
+   - Public showcase (`/artists/[slug]`) dynamically displays custom requirements or collapses if empty.
+   - Graceful fallback in `app/actions/artist.ts` if database column migration is pending in remote DB.
+
+### 12.5 Next Steps & Phase Boundaries
+
+- **Phase 4.5 Stage 3:** Complete. Test accounts are ready and verified.
+- **Phase 5:** NOT STARTED (Strict rule: Phase 5 remains blocked until explicit user sign-off).
+

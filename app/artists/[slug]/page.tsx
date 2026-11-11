@@ -11,6 +11,16 @@ import { getCurrentUser } from "@/app/auth/actions";
 
 export const instant = false;
 
+// Default baseline technical rider requirements if not customized by artist
+const DEFAULT_TECHNICAL_REQUIREMENTS = [
+  "PA system: Speakers, amplifiers, and mixers for sound.",
+  "Monitors: Stage monitors for band members.",
+  "Microphones: For vocals and instruments (with stands).",
+  "Instruments: Drums set required on stage.",
+  "Power supply: Adequate outlets and extension cords.",
+  "Air travel to venue: Flight arrangements for the band and crew.",
+];
+
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
@@ -58,6 +68,12 @@ async function ArtistProfileContent({ params }: PageProps) {
     ? profile.performance_types.join(", ")
     : "Vocals, Instruments, Live Performance";
   const languageList = profile.languages?.length ? profile.languages.join(", ") : "English, Hindi";
+  
+  // Custom technical rider / terms requirements (if artist customized, show theirs; if empty array, section is hidden; if not configured, use defaults)
+  const requirementsList =
+    Array.isArray(profile.technical_requirements)
+      ? profile.technical_requirements
+      : DEFAULT_TECHNICAL_REQUIREMENTS;
 
   return (
     <main className="min-h-screen bg-white text-gray-900 pt-20 pb-24">
@@ -310,38 +326,23 @@ async function ArtistProfileContent({ params }: PageProps) {
           )}
         </section>
 
-        {/* SECTION: ARTIST TERMS AND CONDITION matching Screenshot 5 */}
-        <section className="mb-12">
-          <h2 className="text-2xl font-black text-gray-900 tracking-tight mb-4">
-            Artist Terms And Condition
-          </h2>
+        {/* SECTION: ARTIST TERMS AND CONDITION */}
+        {requirementsList.length > 0 && (
+          <section className="mb-12">
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight mb-4">
+              Artist Terms And Condition
+            </h2>
 
-          <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm divide-y divide-gray-100 overflow-hidden">
-            <div className="p-4 sm:p-5 text-sm text-gray-700 leading-relaxed">
-              PA system: Speakers, amplifiers, and mixers for sound.
+            <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm divide-y divide-gray-100 overflow-hidden">
+              {requirementsList.map((req, idx) => (
+                <div key={idx} className="p-4 sm:p-5 text-sm text-gray-700 leading-relaxed flex items-start gap-3">
+                  <span className="text-purple-600 font-bold mt-0.5">•</span>
+                  <span>{req}</span>
+                </div>
+              ))}
             </div>
-
-            <div className="p-4 sm:p-5 text-sm text-gray-700 leading-relaxed">
-              Monitors: Stage monitors for band members.
-            </div>
-
-            <div className="p-4 sm:p-5 text-sm text-gray-700 leading-relaxed">
-              Microphones: For vocals and instruments (with stands).
-            </div>
-
-            <div className="p-4 sm:p-5 text-sm text-gray-700 leading-relaxed">
-              Instruments: Drums set required on stage.
-            </div>
-
-            <div className="p-4 sm:p-5 text-sm text-gray-700 leading-relaxed">
-              Power supply: Adequate outlets and extension cords.
-            </div>
-
-            <div className="p-4 sm:p-5 text-sm text-gray-700 leading-relaxed">
-              Air travel to venue: Flight arrangements for the band and crew.
-            </div>
-          </div>
-        </section>
+          </section>
+        )}
 
       </div>
     </main>
