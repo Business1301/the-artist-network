@@ -720,13 +720,21 @@ All integration checks executed with 100% pass rate:
      - Audit Log Viewer: Added badges for `suspend_profile` and `reinstate_profile`.
   7. **Future Booking Calendar Requirement (Documented for Future Phase):**
      - Approved product requirement for an artist gig calendar: manual external bookings, blocked dates, private booking details, availability/overlap warnings, and future platform booking integration. (Not yet implemented; Phase 5 remains blocked).
-- **Migration SQL File:** Prepared at [`supabase/migrations/20261112_self_publish.sql`](file:///c:/Users/mohit/OneDrive/Desktop/The Artist Network/supabase/migrations/20261112_self_publish.sql) for manual execution by platform owner in Supabase Dashboard SQL Editor.
+- **Migration SQL File:** Successfully executed by platform owner in Supabase Dashboard SQL Editor (`20261112_self_publish.sql`).
+- **Live Integration & Security Verification Results (Post-Migration):**
+  1. **Public Discovery Query & Sorting:** PASS ✅ — Verified artists strictly rank first in default `recommended` sort; explicit sorts (`price_low_high`, `price_high_low`, `newest`) are strictly respected without verification override.
+  2. **RLS Privacy Shielding:** PASS ✅ — Anonymous queries for `draft`, `suspended`, `pending_review`, and `rejected` returned exactly 0 rows.
+  3. **Database-Level Publication Validation:** PASS ✅ — Direct update attempting `published` with short bio (<30 chars) rejected by DB trigger with code `23514`.
+  4. **Artist Self-Publishing Flow:** PASS ✅ — Complete profile published immediately without admin approval.
+  5. **Anti-Tampering Invariant 1:** PASS ✅ — Artist attempting `UPDATE is_verified = true` blocked by DB trigger.
+  6. **Anti-Tampering Invariant 3:** PASS ✅ — Artist attempting `UPDATE profile_status = 'suspended'` blocked by DB trigger.
+  7. **Unpublishing Flow:** PASS ✅ — Profile reverted to draft and immediately disappeared from public discovery.
+  8. **Admin RPC Authorization Gate:** PASS ✅ — Anonymous, artist, and business attempts to call `admin_moderate_artist_profile` all rejected with `42501` / permission denied.
 - **Verification:** TypeScript: 0 errors, ESLint: 0 errors, Production build: 16/16 routes compiled cleanly.
 
 ### 12.8 Next Steps & Phase Boundaries
 
-- **Phase 4.5 Stage 3:** Self-publishing code, security triggers, RLS policies, admin controls, and UI updates complete.
-- **Migration Execution:** Awaiting owner execution of `20261112_self_publish.sql` in Supabase SQL editor.
+- **Phase 4.5 Stage 3 Final Sign-off:** Self-publishing verification complete. Test artist `Demo Test Artist` is published and available for owner suspension/reinstatement smoke test in `/admin/applications`.
 - **Phase 5:** NOT STARTED (Strict rule: Phase 5 remains blocked until explicit user sign-off).
 
 
