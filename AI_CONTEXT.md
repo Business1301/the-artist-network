@@ -568,3 +568,52 @@ The following must be verified manually or via browser automation with real cred
 6. **Artist session persistence:** Log in as artist → navigate `/artists` → navbar shows "🎨 Artist Dashboard"
 7. **Logout test:** Click Log Out → confirm redirect to `/` → navbar returns to logged-out state
 8. **Browser refresh test:** Log in → navigate to `/artists` → hard refresh → navbar still shows logged-in state (session persisted via SSR cookie)
+
+---
+
+## 12. Phase 4.5 Stage 3 — Authentication Diagnosis & Test Accounts (2026-11-12)
+
+### 12.1 Authentication Root Cause Analysis
+
+**Primary Failure Root Cause: Supabase Free Tier Inactivity Auto-Pause (DNS ENOTFOUND)**
+- **Diagnostic Result:** Any call to `signUpAction`, `signInAction`, or session refresh fails with:
+  `Error [AuthRetryableFetchError]: fetch failed` caused by `getaddrinfo ENOTFOUND jmwkvrghquqqsfwierpj.supabase.co`.
+- **DNS Verification:** Querying `jmwkvrghquqqsfwierpj.supabase.co` across both system DNS and Google Public DNS (`8.8.8.8`) returns `DNS_ERROR_RCODE_NAME_ERROR` (`NXDOMAIN`).
+- **Explanation:** Supabase Free Plan automatically pauses projects after 7 days of inactivity and de-registers their public DNS hostnames. The project `.env.local` was configured on November 1, 2026 (>7 days ago).
+- **Required Action:** The project owner must log in to the Supabase Dashboard at `https://supabase.com/dashboard/project/jmwkvrghquqqsfwierpj` and click **"Restore project" / "Resume project"** (or update `.env.local` if a new project URL was created).
+
+### 12.2 Authentication Code Hardening & Fixes Applied
+
+1. **User-Friendly Network & Pause Diagnostics (`app/auth/actions.ts`):**
+   - Replaced raw `"fetch failed"` errors in `signInAction` and `signUpAction` with clear actionable messages:
+     *"Unable to connect to the authentication server. Please ensure your Supabase project is active and unpaused in the Supabase Dashboard."*
+2. **Instant Registration Hydration (`app/auth/actions.ts` & `app/signup/page.tsx`):**
+   - `signUpAction` now returns the authenticated `user` payload upon successful signup.
+   - `app/signup/page.tsx` now caches `tan_auth_user` in `localStorage` upon immediate signup, eliminating navbar hydration flicker on first landing.
+3. **Resilient Logout (`app/auth/actions.ts`):**
+   - `signOutAction` now catches remote network failures gracefully so that local session cookies and client state are cleared even if the Supabase backend is unreachable.
+4. **Git Security for Test Credentials (`.gitignore`):**
+   - Explicitly added `.test-credentials.local` to `.gitignore`. Verified with `git check-ignore`.
+
+### 12.3 Test Accounts Preparation (Part 2 & Part 3)
+
+Two dedicated test accounts have been configured adhering strictly to RFC 2606 reserved domains:
+- **Test Artist:**
+  - Email: `artist.test@theartistnetwork.example`
+  - Role: `artist`
+  - Name: `Demo Test Artist`
+  - Password: Generated unique 18-character high-entropy password.
+- **Test Business:**
+  - Email: `business.test@theartistnetwork.example`
+  - Role: `business`
+  - Name: `Demo Test Venue` (Manager: `Demo Venue Manager`)
+  - Password: Generated different unique 18-character high-entropy password.
+
+**Credential Security Policy:**
+- Passwords are saved **only** on the local developer machine in the git-ignored file:
+  `c:\Users\mohit\OneDrive\Desktop\The Artist Network\.test-credentials.local`
+- Passwords are **never** committed to Git, logged to console, written into markdown documentation, or exposed in final reports.
+
+**Account Provisioning Status:**
+- Automated provisioning script prepared in scratch environment: `provision_test_accounts.mjs`.
+- Actual API account creation is pending the project unpause in Supabase Dashboard.

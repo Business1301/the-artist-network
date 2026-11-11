@@ -71,9 +71,14 @@ export async function signUpAction(formData: {
   });
 
   if (error) {
+    const isNetworkError =
+      error.message?.includes("fetch failed") ||
+      error.name === "AuthRetryableFetchError";
     return {
       success: false,
-      message: error.message,
+      message: isNetworkError
+        ? "Unable to connect to the authentication server. Please ensure your Supabase project is active and unpaused in the Supabase Dashboard."
+        : error.message,
     };
   }
 
@@ -91,6 +96,14 @@ export async function signUpAction(formData: {
     success: true,
     redirectTo: role === "business" ? "/dashboard/restaurant" : "/dashboard/artist",
     message: "Registration completed successfully!",
+    user: data.user
+      ? {
+          id: data.user.id,
+          email: data.user.email || "",
+          role,
+          fullName: metaData.full_name || "",
+        }
+      : undefined,
   };
 }
 
@@ -127,9 +140,14 @@ export async function signInAction(formData: {
   });
 
   if (error) {
+    const isNetworkError =
+      error.message?.includes("fetch failed") ||
+      error.name === "AuthRetryableFetchError";
     return {
       success: false,
-      message: error.message,
+      message: isNetworkError
+        ? "Unable to connect to the authentication server. Please ensure your Supabase project is active and unpaused in the Supabase Dashboard."
+        : error.message,
     };
   }
 
@@ -220,8 +238,12 @@ export async function signOutAction(): Promise<AuthResponse> {
     };
   }
 
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  try {
+    const supabase = await createClient();
+    await supabase.auth.signOut();
+  } catch {
+    // If remote signOut fails or network is down, still allow client to proceed with local logout
+  }
 
   return {
     success: true,

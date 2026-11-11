@@ -101,6 +101,9 @@ function SignUpForm() {
         if (res.needsEmailConfirmation) {
           setEmailConfirmationRequired(true);
         } else if (res.redirectTo) {
+          if (res.user && typeof window !== "undefined") {
+            localStorage.setItem("tan_auth_user", JSON.stringify(res.user));
+          }
           router.push(res.redirectTo);
           router.refresh();
         } else {
