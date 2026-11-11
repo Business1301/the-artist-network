@@ -359,6 +359,7 @@ function DirectoryLoadingSkeleton() {
 }
 
 export default async function ArtistsPage(props: PageProps) {
+  await connection();
   const currentUser = await getCurrentUser();
 
   return (

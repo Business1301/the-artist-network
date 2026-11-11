@@ -360,6 +360,7 @@ function ProfileLoadingSkeleton() {
 }
 
 export default async function PublicArtistProfilePage({ params }: PageProps) {
+  await connection();
   const currentUser = await getCurrentUser();
 
   return (
