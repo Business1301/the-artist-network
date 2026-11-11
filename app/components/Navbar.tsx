@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getCurrentUser, signOutAction, type CurrentUser } from "@/app/auth/actions";
@@ -24,9 +24,17 @@ export default function Navbar({ initialUser }: NavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // Synchronous state initialization from SSR prop or localStorage to prevent any UI flicker
+  // Derive a stable user ID string for effect comparisons.
+  // `undefined` means SSR did not provide a value (public page).
+  // `null` means SSR confirmed the user is logged out.
+  // An object means SSR provided an authenticated user.
+  const initialUserId =
+    initialUser === undefined ? undefined : initialUser?.id ?? null;
+
+  // Synchronous state initialization: prefer SSR prop, then localStorage cache.
+  // This runs only once at mount — subsequent SSR prop changes are handled below.
   const [user, setUser] = useState<NavbarUser | null>(() => {
-    if (initialUser !== undefined) return initialUser;
+    if (initialUser !== undefined) return initialUser ?? null;
     if (typeof window !== "undefined") {
       const cached = localStorage.getItem("tan_auth_user");
       if (cached) {
@@ -40,23 +48,37 @@ export default function Navbar({ initialUser }: NavbarProps) {
     return null;
   });
 
-  const [prevInitialUser, setPrevInitialUser] = useState(initialUser);
-  if (initialUser !== prevInitialUser) {
-    setPrevInitialUser(initialUser);
-    setUser(initialUser ?? null);
-  }
+  // Ref used to prevent duplicate async getCurrentUser() calls.
+  const asyncFetchDoneRef = useRef(false);
 
-  // Keep state verified against database public.profiles via server action
+  // ── Effect 1: Sync localStorage whenever the SSR-provided identity changes ──
+  // We watch the *derived ID* (string | null | undefined), not the object, so
+  // a new object reference with the same ID does not re-run this effect.
+  // State update is NOT called here — the lazy initializer above handles the
+  // initial render, and updates on identity change are handled via Effect 2
+  // which ultimately re-computes `user` from the server.
   useEffect(() => {
-    let isMounted = true;
-
-    if (initialUser !== undefined) {
-      if (initialUser) {
-        localStorage.setItem("tan_auth_user", JSON.stringify(initialUser));
-      } else {
-        localStorage.removeItem("tan_auth_user");
-      }
+    if (initialUser === undefined) return; // public page — nothing to sync
+    if (initialUser) {
+      localStorage.setItem("tan_auth_user", JSON.stringify(initialUser));
+    } else {
+      localStorage.removeItem("tan_auth_user");
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialUserId]);
+
+  // ── Effect 2: One-time async verification from the database ──
+  // On pages where SSR did not pass initialUser (login, signup, public pages),
+  // we do a single getCurrentUser() call on mount to check actual auth state.
+  // On authenticated pages the SSR prop already provides the correct value.
+  // We deliberately do NOT put initialUser/initialUserId in the dependency array
+  // to prevent this effect from re-running on every router.refresh() call —
+  // that would create the reload loop the user reported.
+  useEffect(() => {
+    if (asyncFetchDoneRef.current) return;
+    asyncFetchDoneRef.current = true;
+
+    let isMounted = true;
 
     getCurrentUser()
       .then((verified) => {
@@ -75,7 +97,8 @@ export default function Navbar({ initialUser }: NavbarProps) {
     return () => {
       isMounted = false;
     };
-  }, [initialUser]);
+  // Run once on mount only — intentionally empty deps array.
+  }, []);
 
   const handleSignOut = async () => {
     setIsLoggingOut(true);

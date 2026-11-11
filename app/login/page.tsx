@@ -76,8 +76,10 @@ function LoginForm() {
           localStorage.setItem("tan_auth_user", JSON.stringify(res.user));
         }
         setNotice({ message: res.message || "Login successful! Redirecting..." });
+        // router.push() triggers RSC re-render on the destination page;
+        // an immediate router.refresh() causes a redundant cycle that re-fires
+        // the Navbar auth effect and produces the visible reload loop.
         router.push(res.redirectTo);
-        router.refresh();
       } else {
         setNotice({ message: res.message || "Unable to sign in.", error: true });
       }
