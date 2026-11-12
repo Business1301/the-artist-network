@@ -801,20 +801,25 @@ All integration checks executed with 100% pass rate:
   - `npm run lint`: 0 errors (only pre-existing `<img>` warnings).
   - `npm run build`: 16/16 routes compiled successfully.
 
-### 12.11 Phase 4.6 Stage 1 Preparation: Calendar Database Migration & RPCs (Prepared, Pending Approval)
+### 12.11 Phase 4.6 Stage 1 Preparation: Calendar Database Migration & RPCs (Ready for Execution)
 
 - **Scope:** Prepared the complete, transaction-safe database foundation for the artist calendar & availability system without executing live SQL.
 - **Deliverables Prepared:**
   1. **Migration File (`supabase/migrations/20261112_artist_calendar.sql`):**
-     - Custom Enums: `calendar_event_source` (`external_manual`, `platform_booking`), `calendar_event_type` (`gig_booking`, `unavailable_block`), `calendar_booking_status` (`tentative`, `confirmed`, `cancelled`, `completed`).
+     - Constraints: Standard `TEXT CHECK` matching platform conventions:
+       - `source IN ('external_manual', 'platform_booking')`
+       - `event_type IN ('gig_booking', 'unavailable_block')`
+       - `status IN ('tentative', 'confirmed', 'cancelled', 'completed')`
      - Table `public.artist_calendar_events`: Timezone-aware (`TIMESTAMPTZ`), strict timing check (`end_time > start_time`), private financial & client columns.
      - Anti-Tampering Triggers:
-       - `trg_calendar_event_insert_protection`: Verifies caller has `artist` role in `profiles`, ensures `auth.uid() = artist_id`, and blocks client creation of `platform_booking` or forged `platform_inquiry_id`.
+       - `trg_calendar_event_insert_protection`: Verifies caller has `artist` role in `profiles`, ensures `auth.uid() = artist_id`, and blocks client creation of `platform_booking` or forged `platform_inquiry_id`. Clarified error message: "Only registered artists can manage calendar events" (does not require `is_verified`).
        - `trg_calendar_event_update_protection`: Prevents modifying `artist_id`, `source`, or `platform_inquiry_id`; prevents direct edits to platform-generated bookings.
        - `trg_calendar_event_delete_protection`: Prevents direct client deletion of platform-generated bookings.
      - Row Level Security (RLS): Strictly owner-only (`auth.uid() = artist_id`). Zero public/anon grants.
+     - Client Write Privileges Revoked: Direct `INSERT`, `UPDATE`, and `DELETE` on `public.artist_calendar_events` are explicitly revoked from `authenticated` and `anon`/`public`. Authenticated users retain `SELECT` only. All mutations must go through the atomic RPCs.
      - Atomic Write RPC (`save_artist_calendar_event`): Acquires per-artist advisory lock (`pg_advisory_xact_lock`), runs conflict overlap detection, requires `p_allow_overlap = true` for intentional double-bookings, and handles insert/update in a single transaction.
      - Atomic Delete RPC (`delete_artist_calendar_event`): Enforces owner match and blocks manual deletion of platform bookings.
+     - Schema Reload Notification: Executes `NOTIFY pgrst, 'reload schema';` immediately after `COMMIT;`.
   2. **Safe Rollback Procedure (`supabase/migrations/20261112_artist_calendar_rollback.sql`):**
      - Non-destructive safety latch: Checks row count in `artist_calendar_events`. If rows exist, deliberately aborts unless owner backs up data and explicitly overrides via archival rename (`artist_calendar_events_archive_<timestamp>`).
 - **Date & Time Semantics:**
