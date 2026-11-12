@@ -458,19 +458,24 @@ export default function ArtistDashboardPage() {
               </p>
             </div>
 
-            {/* Gig Schedule — Coming Soon Notice */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-lg">📅</span>
-                <h3 className="text-sm font-bold text-gray-900">Gig Schedule &amp; Calendar</h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 uppercase tracking-wider">
-                  Coming Soon
-                </span>
+            {/* Gig Schedule & Calendar — Live */}
+            <Link
+              href="/dashboard/artist/calendar"
+              className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:border-purple-200 hover:shadow-md transition-all group flex flex-col gap-3 no-underline"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 group-hover:bg-purple-100 transition-colors flex items-center justify-center text-lg shrink-0">
+                  📅
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-gray-900">Gig Schedule &amp; Calendar</h3>
+                  <p className="text-[11px] text-gray-500">Manage your availability and external bookings</p>
+                </div>
               </div>
-              <p className="text-xs text-gray-500 leading-relaxed">
-                Your confirmed gigs, upcoming performances, and availability calendar will be managed here. You will be able to block dates, track bookings, and share your schedule with enquiring clients.
-              </p>
-            </div>
+              <span className="text-xs text-purple-600 font-semibold group-hover:underline">
+                Open Calendar →
+              </span>
+            </Link>
           </div>
         )}
 

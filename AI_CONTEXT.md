@@ -837,9 +837,71 @@ All integration checks executed with 100% pass rate:
   - `npm run build`: 16/16 routes compiled successfully.
   - Integration Test Suite: 10/10 checks passed against live Supabase backend. All test events cleaned up (final row count = 0).
 
-### 12.13 Next Steps & Phase Boundaries
+### 12.13 Phase 4.6 Stage 3: Artist Calendar Frontend UI (COMPLETED)
 
-- **Phase 4.6 Stage 3 (Pending):** Dedicated Artist Calendar UI (`/dashboard/artist/calendar`), month/week views, booking creation modal, and conflict resolution dialog.
+- **Status (2026-11-12):** Stage 3 fully implemented and build-verified.
+- **Build result:** 17/17 pages compiled. `npx tsc --noEmit` → 0 errors. `npm run lint` → 0 errors (9 pre-existing `<img>` warnings unchanged). `npm run build` → exit 0.
+- **Git commit:** See `feat(calendar): implement Phase 4.6 Stage 3 calendar frontend UI`
+
+#### Files Created
+
+| File | Purpose |
+|------|---------|
+| `app/dashboard/artist/calendar/page.tsx` | Main calendar page — Month/Week view orchestrator, navigation, event CRUD dispatch |
+| `app/components/calendar/EventFormModal.tsx` | Add/Edit form for gigs & unavailable blocks, Zod-validated, IST timezone, conflict flow |
+| `app/components/calendar/MonthView.tsx` | Responsive month grid (desktop pills + mobile dots + agenda) |
+| `app/components/calendar/WeekView.tsx` | 7-day time-based view (desktop columns + mobile day selector/agenda) |
+| `app/components/calendar/EventBadge.tsx` | Color-coded event pill (updated onClick signature) |
+| `app/components/calendar/EventDetailsModal.tsx` | Full private details modal (from Stage 3 partial — already existed) |
+| `app/components/calendar/ConflictModal.tsx` | Conflict confirmation dialog with "Save Anyway" flow |
+| `app/components/calendar/DeleteConfirmModal.tsx` | Delete confirmation dialog |
+
+#### Files Updated
+
+| File | Change |
+|------|--------|
+| `app/dashboard/artist/page.tsx` | Replaced "Coming Soon" calendar card with live link to `/dashboard/artist/calendar` |
+| `lib/calendar/utils.ts` | Extended with `getTodayIstDateStr`, `utcIsoToIstDateStr`, `utcIsoToIstTimeStr`, `formatIstTimeRange`, `eventOccursOnIstDate`, `formatCurrencyInr`, `getDaysInMonthGrid`, `getDaysInWeekGrid`, `getMonthDateRange`, `getWeekDateRange` |
+
+#### Architecture
+
+- `/dashboard/artist/calendar` is a **client component** (`"use client"`). Auth guard inherited from `app/dashboard/artist/layout.tsx` which calls `requireArtist()` server-side.
+- Event data loading uses a local `async function fetchEvents()` defined inside `useEffect`, matching the project's established pattern.
+- Stale-fetch guard: `fetchIdRef` counter discards out-of-order responses.
+- Manual refresh via `refreshTick` state increment — avoids `useCallback` complexity.
+- **Never** accepts `artist_id` from client. All mutations go through `save_artist_calendar_event` / `delete_artist_calendar_event` RPCs via Stage 2 Server Actions.
+- Platform bookings (`source = "platform_booking"`) are displayed read-only; Edit/Delete buttons hidden.
+- All times displayed and entered in Asia/Kolkata (IST, UTC+05:30). Stored as UTC ISO in Supabase.
+- For all-day events, end is stored as exclusive boundary (start of next day 00:00 IST → UTC).
+
+#### Month View
+- Monday-first grid, 35–42 cells via `getDaysInMonthGrid()`.
+- Desktop: full grid with up to 3 event pills per cell, "+N more" overflow.
+- Mobile (`< sm`): compact number grid with coloured dots + selected-day agenda panel below.
+- Today highlighted with purple filled circle.
+- Quick-add "+" button appears on hover per day cell.
+
+#### Week View
+- Compressed time grid: 07:00–23:00 IST (60px/hour).
+- All-day events shown in dedicated row above timed grid.
+- Timed events positioned by CSS `top` / `height` using IST time-to-pixel conversion.
+- Current-time indicator line for today's column.
+- Mobile: horizontal scrollable day chip row + single-day agenda.
+
+#### Conflict Flow
+- On submit, Server Action calls `save_artist_calendar_event` with `allow_overlap: false`.
+- If RPC returns `conflict: true`, `EventFormModal` captures `conflictPending` and renders `ConflictModal` as a sibling overlay.
+- "Cancel & Adjust": clears conflict, returns to form.
+- "Save Anyway": re-calls Server Action with `allow_overlap: true`.
+
+#### Security
+- Authorization: every Server Action calls `verifyArtistSession()` → `auth.getUser()` + `profiles.role` DB query. No `user_metadata` trust.
+- No direct table writes from client.
+- Private financials and client contact rendered only in `EventDetailsModal` (private artist view, never public).
+
+### 12.14 Next Steps & Phase Boundaries
+
+- **Phase 4.6 Stage 3:** ✅ COMPLETED
 - **Phase 5:** NOT STARTED (Strict rule: Phase 5 remains blocked until explicit user sign-off).
 
 
