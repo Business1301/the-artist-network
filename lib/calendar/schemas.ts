@@ -115,6 +115,20 @@ function applyCalendarRefinements<T extends z.ZodObject<any>>(schema: T) {
     );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyFutureStartRefinement<T extends z.ZodType<any>>(schema: T) {
+  return schema.refine(
+    (data) => {
+      const item = data as CalendarRefinementData;
+      return new Date(item.start_time).getTime() > Date.now();
+    },
+    {
+      message: "Bookings must start in the future. Please select a later date or time.",
+      path: ["start_time"],
+    }
+  );
+}
+
 /**
  * Base Schema for Calendar Event Payload
  */
@@ -123,19 +137,23 @@ export const calendarEventBaseSchema = applyCalendarRefinements(calendarEventRaw
 /**
  * Schema for Creating a Manual External Gig
  */
-export const createManualGigSchema = applyCalendarRefinements(
-  calendarEventRawShape.extend({
-    event_type: z.literal("gig_booking").default("gig_booking"),
-  })
+export const createManualGigSchema = applyFutureStartRefinement(
+  applyCalendarRefinements(
+    calendarEventRawShape.extend({
+      event_type: z.literal("gig_booking").default("gig_booking"),
+    })
+  )
 );
 
 /**
  * Schema for Creating an Unavailable / Blocked Time Period
  */
-export const createUnavailableBlockSchema = applyCalendarRefinements(
-  calendarEventRawShape.extend({
-    event_type: z.literal("unavailable_block").default("unavailable_block"),
-  })
+export const createUnavailableBlockSchema = applyFutureStartRefinement(
+  applyCalendarRefinements(
+    calendarEventRawShape.extend({
+      event_type: z.literal("unavailable_block").default("unavailable_block"),
+    })
+  )
 );
 
 /**

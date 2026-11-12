@@ -154,6 +154,19 @@ export async function createManualGigAction(
 
   const payload = parsed.data;
 
+  // Strict server-side verification: new bookings must start in the future
+  if (new Date(payload.start_time).getTime() <= Date.now()) {
+    return {
+      success: false,
+      error: "Bookings must start in the future. Please select a later date or time.",
+      validationErrors: {
+        start_time: [
+          "Bookings must start in the future. Please select a later date or time.",
+        ],
+      },
+    };
+  }
+
   const { data, error } = await supabase.rpc("save_artist_calendar_event", {
     p_title: payload.title,
     p_event_type: "gig_booking",
@@ -242,6 +255,19 @@ export async function createUnavailableBlockAction(
 
   const payload = parsed.data;
 
+  // Strict server-side verification: new bookings must start in the future
+  if (new Date(payload.start_time).getTime() <= Date.now()) {
+    return {
+      success: false,
+      error: "Bookings must start in the future. Please select a later date or time.",
+      validationErrors: {
+        start_time: [
+          "Bookings must start in the future. Please select a later date or time.",
+        ],
+      },
+    };
+  }
+
   const { data, error } = await supabase.rpc("save_artist_calendar_event", {
     p_title: payload.title,
     p_event_type: "unavailable_block",
@@ -328,6 +354,45 @@ export async function updateCalendarEventAction(
   }
 
   const payload = parsed.data;
+
+  // 1. Verify existence, ownership, and platform immutability
+  const { data: existingEvent, error: fetchError } = await supabase
+    .from("artist_calendar_events")
+    .select("id, start_time, source")
+    .eq("id", payload.event_id)
+    .eq("artist_id", authCheck.userId)
+    .single();
+
+  if (fetchError || !existingEvent) {
+    return {
+      success: false,
+      error: "Event not found or access denied.",
+    };
+  }
+
+  if (existingEvent.source === "platform_booking") {
+    return {
+      success: false,
+      error: "Platform-generated bookings cannot be modified manually.",
+    };
+  }
+
+  // 2. Prevent rescheduling to a past timestamp (allow metadata-only edits of past events)
+  const isStartTimeChanged =
+    new Date(existingEvent.start_time).getTime() !==
+    new Date(payload.start_time).getTime();
+
+  if (isStartTimeChanged && new Date(payload.start_time).getTime() <= Date.now()) {
+    return {
+      success: false,
+      error: "Rescheduled events must start in the future. Please select a later date or time.",
+      validationErrors: {
+        start_time: [
+          "Rescheduled events must start in the future. Please select a later date or time.",
+        ],
+      },
+    };
+  }
 
   const { data, error } = await supabase.rpc("save_artist_calendar_event", {
     p_event_id: payload.event_id,

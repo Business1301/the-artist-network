@@ -21,6 +21,75 @@ export function getTodayIstDateStr(): string {
 }
 
 /**
+ * Get tomorrow's date in Asia/Kolkata as "YYYY-MM-DD"
+ */
+export function getTomorrowIstDateStr(): string {
+  const istEpoch = Date.now() + IST_OFFSET_MS + 24 * 60 * 60 * 1000;
+  const d = new Date(istEpoch);
+  const year = d.getUTCFullYear();
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Get default start and end times in Asia/Kolkata for new events.
+ * Guarantees that timed events default to a future time.
+ */
+export function getDefaultFutureIstTimings(targetDateStr?: string): {
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+} {
+  const todayStr = getTodayIstDateStr();
+  const tomorrowStr = getTomorrowIstDateStr();
+  const nowIst = new Date(Date.now() + IST_OFFSET_MS);
+  const currentHour = nowIst.getUTCHours();
+
+  let startDate = targetDateStr || todayStr;
+
+  // If the target date is strictly in the past, bump to today or tomorrow
+  if (startDate < todayStr) {
+    startDate = todayStr;
+  }
+
+  // If the event starts today
+  if (startDate === todayStr) {
+    // If it's already 22:00 or later today, default to tomorrow morning 09:00 - 11:00
+    if (currentHour >= 22) {
+      return {
+        startDate: tomorrowStr,
+        startTime: "09:00",
+        endDate: tomorrowStr,
+        endTime: "11:00",
+      };
+    }
+
+    // Default to the next whole hour + 1
+    const nextStartHour = currentHour + 1;
+    const nextEndHour = Math.min(23, nextStartHour + 2);
+    const startHourStr = String(nextStartHour).padStart(2, "0");
+    const endHourStr = String(nextEndHour).padStart(2, "0");
+
+    return {
+      startDate: todayStr,
+      startTime: `${startHourStr}:00`,
+      endDate: todayStr,
+      endTime: `${endHourStr}:00`,
+    };
+  }
+
+  // For future dates, default to 09:00 - 11:00
+  return {
+    startDate,
+    startTime: "09:00",
+    endDate: startDate,
+    endTime: "11:00",
+  };
+}
+
+/**
  * Extract "YYYY-MM-DD" in Asia/Kolkata from a UTC ISO timestamp
  */
 export function utcIsoToIstDateStr(isoString: string): string {

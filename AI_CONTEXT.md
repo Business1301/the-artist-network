@@ -931,10 +931,46 @@ All integration checks executed with 100% pass rate:
   - `npm run lint`: 0 errors (9 pre-existing `<img>` warnings unchanged).
   - `npm run build`: Exit code 0, 17/17 pages generated successfully.
 
-### 12.15 Phase Boundaries & Handover
+### 12.15 Phase 4.6 Calendar Bug Fix: Prevent Past-Date Bookings (COMPLETED)
 
-- **Phase 4.6 (Artist Calendar & Availability):** ✅ FULLY COMPLETED (Stages 1, 2, 3, and 4 all verified and committed).
+- **Issue Reported (2026-11-12):** During manual testing, an artist could schedule new bookings or unavailable blocks for dates and times that had already passed.
+- **Solution & Enforcement Architecture:**
+  - **Client-Side Real-Time Validation (`EventFormModal.tsx`):**
+    - Input `min` attribute set on `start_date` (`getTomorrowIstDateStr()` for all-day events, `getTodayIstDateStr()` for timed events).
+    - Intelligent initial timings via `getDefaultFutureIstTimings()`: defaults to future hours today (or tomorrow morning if late in the evening).
+    - Live validation warns user immediately if a selected start time is in the past: *"Bookings must start in the future. Please select a later date or time."*
+    - Toggling `is_all_day` automatically bumps `start_date` to tomorrow if today or past was selected (since today's 00:00 IST midnight has passed).
+    - Submit button disabled when past time is selected (`disabled={isSaving || isPastBooking}`).
+    - Revalidated at exact moment of submit to account for time elapsed while modal was open.
+  - **Server-Side Validation & Zod Schemas (`lib/calendar/schemas.ts`, `app/actions/calendar.ts`):**
+    - `createManualGigSchema` and `createUnavailableBlockSchema` enforce `start_time > Date.now()`.
+    - `createManualGigAction` and `createUnavailableBlockAction` independently reject `start_time <= Date.now()`.
+    - `updateCalendarEventAction` allows historical metadata edits (notes, venue, contacts, fee) on past events if `start_time` is unchanged, but strictly rejects rescheduling an event to a past timestamp.
+  - **Database Protection Assessment (`save_artist_calendar_event` RPC):**
+    - Direct RPC bypass assessment: the currently deployed RPC checked `p_end_time <= p_start_time` but lacked `p_start_time <= clock_timestamp()`.
+    - Prepared minimal follow-up migration: `supabase/migrations/20261112_prevent_past_calendar_events.sql` ready for owner review. Not executed.
+  - **QA Test Suite (`scratch/test_past_bookings.ts` — 14/14 PASS):**
+    - Yesterday at 8 PM IST: rejected.
+    - Today, one hour ago: rejected.
+    - Today, one hour from now: allowed.
+    - Tomorrow: allowed.
+    - All-day yesterday: rejected.
+    - All-day today: rejected.
+    - All-day tomorrow: allowed.
+    - Existing historical event metadata update: allowed.
+    - Rescheduling an event into the past: rejected.
+    - Crossing midnight IST in future: allowed.
+    - `getDefaultFutureIstTimings()` future guarantee: verified.
+- **Build Verification:**
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run lint`: 0 errors (9 pre-existing `<img>` warnings unchanged).
+  - `npm run build`: Exit code 0, 17/17 pages generated successfully.
+
+### 12.16 Phase Boundaries & Handover
+
+- **Phase 4.6 (Artist Calendar & Availability):** ✅ FULLY COMPLETED (Stages 1-4 + Past-Date Bugfix verified and committed).
 - **Phase 5 (Public Enquiries & Booking Workflow):** ⛔ STRICTLY BLOCKED — DO NOT START until explicit user sign-off.
+
 
 
 

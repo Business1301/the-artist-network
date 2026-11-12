@@ -11,6 +11,9 @@ import {
   istToUtcIso,
   utcIsoToIstDateStr,
   utcIsoToIstTimeStr,
+  getTodayIstDateStr,
+  getTomorrowIstDateStr,
+  getDefaultFutureIstTimings,
 } from "@/lib/calendar/utils";
 import {
   createManualGigAction,
@@ -87,16 +90,28 @@ function buildInitialForm(
     };
   }
 
-  const today = defaultDate ?? new Date().toISOString().slice(0, 10);
+  const timings = getDefaultFutureIstTimings(defaultDate);
+  const isBlock = eventType === "unavailable_block";
+  const defaultIsAllDay = isBlock;
+  const tomorrow = getTomorrowIstDateStr();
+
+  // All-day bookings must start tomorrow or later (today's midnight has passed)
+  const startDate = defaultIsAllDay
+    ? (timings.startDate <= getTodayIstDateStr() ? tomorrow : timings.startDate)
+    : timings.startDate;
+  const endDate = defaultIsAllDay
+    ? (timings.endDate < startDate ? startDate : timings.endDate)
+    : timings.endDate;
+
   return {
     title: "",
     event_type: eventType,
     status: "confirmed",
-    start_date: today,
-    start_time: "09:00",
-    end_date: today,
-    end_time: "11:00",
-    is_all_day: false,
+    start_date: startDate,
+    start_time: timings.startTime,
+    end_date: endDate,
+    end_time: timings.endTime,
+    is_all_day: defaultIsAllDay,
     city: "",
     venue_name: "",
     venue_address: "",
@@ -134,6 +149,7 @@ export default function EventFormModal({
   const [isSaving, setIsSaving] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+  const [isPastBooking, setIsPastBooking] = useState(false);
   const [conflictPending, setConflictPending] = useState<{
     conflicts: ConflictingEvent[];
     payload: unknown;
@@ -142,11 +158,31 @@ export default function EventFormModal({
 
   const wasOpenRef = useRef(false);
 
+  // Helper to determine if a form state represents a past booking
+  const evaluateIsPast = useCallback(
+    (currentForm: FormState): boolean => {
+      const startIso = currentForm.is_all_day
+        ? istToUtcIso(currentForm.start_date, "00:00")
+        : istToUtcIso(currentForm.start_date, currentForm.start_time || "00:00");
+
+      const isModified =
+        mode !== "edit" || !initialData
+          ? true
+          : new Date(startIso).getTime() !==
+            new Date(initialData.start_time).getTime();
+
+      return isModified && new Date(startIso).getTime() <= Date.now();
+    },
+    [mode, initialData]
+  );
+
   // Reset form when modal opens (tracks open→closed→open transitions via ref)
   useEffect(() => {
     if (isOpen && !wasOpenRef.current) {
       wasOpenRef.current = true;
-      setForm(buildInitialForm(mode, eventType, initialData, defaultDate));
+      const initial = buildInitialForm(mode, eventType, initialData, defaultDate);
+      setForm(initial);
+      setIsPastBooking(evaluateIsPast(initial));
       setIsSaving(false);
       setGlobalError(null);
       setFieldErrors({});
@@ -155,7 +191,7 @@ export default function EventFormModal({
     } else if (!isOpen) {
       wasOpenRef.current = false;
     }
-  }, [isOpen, mode, eventType, initialData, defaultDate]);
+  }, [isOpen, mode, eventType, initialData, defaultDate, evaluateIsPast]);
 
   // Escape key listener (when not saving or displaying a conflict)
   useEffect(() => {
@@ -171,7 +207,11 @@ export default function EventFormModal({
 
   const setField = useCallback(
     <K extends keyof FormState>(key: K, value: FormState[K]) => {
-      setForm((prev) => ({ ...prev, [key]: value }));
+      setForm((prev) => {
+        const next = { ...prev, [key]: value };
+        setIsPastBooking(evaluateIsPast(next));
+        return next;
+      });
       // Clear field error on change
       if (fieldErrors[key]) {
         setFieldErrors((prev) => {
@@ -181,13 +221,45 @@ export default function EventFormModal({
         });
       }
     },
-    [fieldErrors]
+    [fieldErrors, evaluateIsPast]
   );
-
-  if (!isOpen) return null;
 
   const isBlocked = form.event_type === "unavailable_block";
   const isEdit = mode === "edit";
+
+  const todayStr = getTodayIstDateStr();
+  const tomorrowStr = getTomorrowIstDateStr();
+
+  const pastErrorMessage = form.is_all_day
+    ? "All-day bookings must be scheduled for future dates (tomorrow or later). Today's midnight has already passed."
+    : "Bookings must start in the future. Please select a later date or time.";
+
+  function toggleAllDay() {
+    const nextAllDay = !form.is_all_day;
+    setForm((prev) => {
+      let nextStartDate = prev.start_date;
+      let nextEndDate = prev.end_date;
+
+      // If switching to all-day on a new booking, start_date must be tomorrow or later
+      if (nextAllDay && !isEdit && nextStartDate <= todayStr) {
+        nextStartDate = tomorrowStr;
+        if (nextEndDate < tomorrowStr) {
+          nextEndDate = tomorrowStr;
+        }
+      }
+
+      const next = {
+        ...prev,
+        is_all_day: nextAllDay,
+        start_date: nextStartDate,
+        end_date: nextEndDate,
+      };
+      setIsPastBooking(evaluateIsPast(next));
+      return next;
+    });
+  }
+
+  if (!isOpen) return null;
 
   function buildPayload(allowOverlap: boolean) {
     // All times interpreted as IST
@@ -243,6 +315,30 @@ export default function EventFormModal({
     if (isSaving) return;
     setGlobalError(null);
     setFieldErrors({});
+
+    // Immediate client-side revalidation at exact moment of submit
+    const submitStartIso = form.is_all_day
+      ? istToUtcIso(form.start_date, "00:00")
+      : istToUtcIso(form.start_date, form.start_time);
+
+    const isStartTimeChangedAtSubmit =
+      !isEdit || !initialData
+        ? true
+        : new Date(submitStartIso).getTime() !==
+          new Date(initialData.start_time).getTime();
+
+    if (
+      isStartTimeChangedAtSubmit &&
+      new Date(submitStartIso).getTime() <= Date.now()
+    ) {
+      const msg = form.is_all_day
+        ? "All-day bookings must be scheduled for future dates (tomorrow or later). Today's midnight has already passed."
+        : "Bookings must start in the future. Please select a later date or time.";
+      setGlobalError(msg);
+      setFieldErrors({ start_time: [msg] });
+      return;
+    }
+
     setIsSaving(true);
 
     const payload = buildPayload(false);
@@ -402,7 +498,7 @@ export default function EventFormModal({
                   type="button"
                   role="switch"
                   aria-checked={form.is_all_day}
-                  onClick={() => setField("is_all_day", !form.is_all_day)}
+                  onClick={toggleAllDay}
                   className={`relative w-9 h-5 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-400 ${
                     form.is_all_day ? "bg-purple-600" : "bg-gray-300"
                   }`}
@@ -425,6 +521,7 @@ export default function EventFormModal({
                   <input
                     type="date"
                     value={form.start_date}
+                    min={!isEdit ? (form.is_all_day ? tomorrowStr : todayStr) : undefined}
                     onChange={(e) => setField("start_date", e.target.value)}
                     required
                     className={`${inputCls} mt-1`}
@@ -468,6 +565,14 @@ export default function EventFormModal({
                       className={`${inputCls} mt-1`}
                     />
                   </div>
+                </div>
+              )}
+
+              {/* Inline warning when selected time is in the past */}
+              {isPastBooking && (
+                <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-800 flex items-start gap-2 animate-in fade-in duration-150">
+                  <span className="shrink-0 text-sm">⚠️</span>
+                  <span className="font-medium">{pastErrorMessage}</span>
                 </div>
               )}
 
@@ -627,8 +732,8 @@ export default function EventFormModal({
               </button>
               <button
                 type="submit"
-                disabled={isSaving}
-                className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                disabled={isSaving || isPastBooking}
+                className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSaving ? (
                   <>
