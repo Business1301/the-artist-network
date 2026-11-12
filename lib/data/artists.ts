@@ -18,6 +18,8 @@ export interface PublicArtistSummary {
   profile_image_url: string | null;
   cover_image_url: string | null;
   is_verified: boolean;
+  instagram_url?: string | null;
+  youtube_url?: string | null;
 }
 
 export interface ArtistDiscoveryFilters {
@@ -58,7 +60,9 @@ const PUBLIC_ARTIST_FIELDS = `
   pricing_unit,
   profile_image_url,
   cover_image_url,
-  is_verified
+  is_verified,
+  instagram_url,
+  youtube_url
 `;
 
 /**

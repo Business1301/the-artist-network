@@ -1008,9 +1008,50 @@ All integration checks executed with 100% pass rate:
     - `npm run lint`: **0 errors** (9 acceptable `<img>` warnings).
     - `npm run build`: **17/17 routes generated successfully in 724ms**.
 
-### 12.16 Phase Boundaries & Handover
+### 12.17 Artist Social Media Links (Instagram & YouTube) on Cards & Showcase (COMPLETED)
 
-- **Phase 4.6 (Artist Calendar & Availability):** ✅ FULLY COMPLETED & LIVE-VERIFIED (All stages, bugfixes, and database RPC updates verified on Supabase).
+- **Feature Summary (2026-11-12):**
+  - Added clickable, accessible Instagram and YouTube icons to the bottom-right of the white information section on all public artist discovery cards (`ArtistCard.tsx`).
+  - Added matching icons to individual public artist profile pages (`app/artists/[slug]/page.tsx`) alongside the profile header and share button.
+  - Provided comprehensive URL validation and normalization for artist profile management (`app/dashboard/artist/edit/page.tsx` and `app/actions/artist.ts`).
+
+- **Database Inspection & Reuse:**
+  - `instagram_url` and `youtube_url` **already existed** as native columns in `public.artist_profiles` from migration `20261101_artist_profiles_and_portfolio.sql`.
+  - **Zero SQL schema migrations required.** No database changes needed.
+  - Added `instagram_url` and `youtube_url` to `PublicArtistSummary` and `PUBLIC_ARTIST_FIELDS` in `lib/data/artists.ts`.
+
+- **Component & Architectural Implementation:**
+  - **`lib/utils/socialUrls.ts`:**
+    - Strict HTTPS enforcement (`https://` required).
+    - Domain whitelisting:
+      - Instagram: `instagram.com`, `www.instagram.com`, `instagr.am`, `www.instagr.am` with non-empty handle.
+      - YouTube: `youtube.com`, `www.youtube.com`, `m.youtube.com`, `music.youtube.com`, `youtu.be`, `www.youtu.be` with valid channel/video path.
+    - Rejects dangerous schemes (`javascript:`, `data:`, `vbscript:`, etc.) and invalid domains.
+    - Normalizes URLs before database persistence and before rendering.
+  - **`app/components/ArtistSocialLinks.tsx`:**
+    - Reusable client component supporting `size="sm"` (cards) and `size="md"` (profile showcase).
+    - Automatically hides if neither link is provided or if invalid URLs are detected.
+    - If only Instagram exists, shows only Instagram. If only YouTube exists, shows only YouTube.
+    - Opens links in a new browser tab with `target="_blank"` and `rel="noopener noreferrer"`.
+    - Includes accessible `aria-label`, informative `title` tooltips, visible focus rings, and subtle brand hover effects (pink for Instagram, red for YouTube).
+    - Calls `e.stopPropagation()` on clicks to prevent card navigation.
+  - **`ArtistCard.tsx` Navigation Pattern:**
+    - Refactored from an outer `<Link>` to an outer `<div>` with an absolute stretched link (`<Link className="absolute inset-0 z-0">`) and elevated social buttons (`relative z-10 pointer-events-auto`).
+    - **Eliminates HTML invalid nested `<a>` tags**, preventing React hydration errors while preserving full card clickability, keyboard tab navigation, and image/title hover transitions.
+  - **Artist Profile Editor (`app/dashboard/artist/edit/page.tsx` & `app/actions/artist.ts`):**
+    - Enforces client-side and server-side URL validation on both draft save and publishing.
+    - Added user guidance sub-labels explaining that links will appear on their artist card and public profile.
+
+- **Verification Results:**
+  - `scratch/test_artist_social_links.ts`: **26/26 PASSED**.
+  - `npx tsc --noEmit`: **0 errors**.
+  - `npm run lint`: **0 errors** (9 pre-existing `<img>` warnings unchanged).
+  - `npm run build`: **17/17 routes generated successfully**.
+
+### 12.18 Phase Boundaries & Handover
+
+- **Phase 4.6 (Artist Calendar & Availability):** ✅ FULLY COMPLETED & LIVE-VERIFIED.
+- **Social Media Links (Discovery & Profiles):** ✅ FULLY COMPLETED.
 - **Phase 5 (Public Enquiries & Booking Workflow):** ⛔ STRICTLY BLOCKED — DO NOT START until explicit user sign-off.
 
 

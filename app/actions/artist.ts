@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { validateInstagramUrl, validateYouTubeUrl } from "@/lib/utils/socialUrls";
 
 export interface ArtistProfileData {
   id: string;
@@ -138,6 +139,25 @@ export async function saveArtistProfile(
     return { success: false, message: "City location is required." };
   }
 
+  // Validate and normalize Instagram and YouTube URLs if provided
+  let normalizedInstagramUrl: string | null = null;
+  if (formData.instagram_url && formData.instagram_url.trim()) {
+    const igCheck = validateInstagramUrl(formData.instagram_url);
+    if (!igCheck.isValid) {
+      return { success: false, message: igCheck.error || "Invalid Instagram URL." };
+    }
+    normalizedInstagramUrl = igCheck.normalized;
+  }
+
+  let normalizedYouTubeUrl: string | null = null;
+  if (formData.youtube_url && formData.youtube_url.trim()) {
+    const ytCheck = validateYouTubeUrl(formData.youtube_url);
+    if (!ytCheck.isValid) {
+      return { success: false, message: ytCheck.error || "Invalid YouTube URL." };
+    }
+    normalizedYouTubeUrl = ytCheck.normalized;
+  }
+
   // Sanitize data: Never permit passing is_verified or suspended status
   // Preserve published/legacy status for live profiles; default to draft for new/draft
   const preservedStatuses: string[] = ["published", "pending_review"];
@@ -160,8 +180,8 @@ export async function saveArtistProfile(
     pricing_unit: formData.pricing_unit || "per performance",
     profile_image_url: formData.profile_image_url || null,
     cover_image_url: formData.cover_image_url || null,
-    instagram_url: formData.instagram_url?.trim() || null,
-    youtube_url: formData.youtube_url?.trim() || null,
+    instagram_url: normalizedInstagramUrl,
+    youtube_url: normalizedYouTubeUrl,
     facebook_url: formData.facebook_url?.trim() || null,
     website_url: formData.website_url?.trim() || null,
     // Preserve published/legacy status; default to draft for new or draft profiles

@@ -6,6 +6,7 @@ import type { Metadata } from "next";
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import ShareArtistButton from "@/app/components/ShareArtistButton";
+import ArtistSocialLinks from "@/app/components/ArtistSocialLinks";
 import { getPublicArtistBySlug } from "@/app/actions/artist";
 import { getCurrentUser } from "@/app/auth/actions";
 
@@ -132,8 +133,16 @@ async function ArtistProfileContent({ params }: PageProps) {
                 {profile.stage_name}
               </h1>
 
-              {/* Share Icon Button */}
-              <ShareArtistButton title={profile.stage_name} />
+              {/* Social and Share Action Buttons */}
+              <div className="flex items-center gap-2">
+                <ArtistSocialLinks
+                  instagramUrl={profile.instagram_url}
+                  youtubeUrl={profile.youtube_url}
+                  stageName={profile.stage_name}
+                  size="md"
+                />
+                <ShareArtistButton title={profile.stage_name} />
+              </div>
             </div>
 
             {/* Category with Person Icon */}

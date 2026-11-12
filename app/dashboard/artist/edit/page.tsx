@@ -13,6 +13,7 @@ import {
   ArtistProfileData,
   PortfolioItemData,
 } from "@/app/actions/artist";
+import { validateInstagramUrl, validateYouTubeUrl } from "@/lib/utils/socialUrls";
 
 const CATEGORIES = [
   "Singers & Vocalists",
@@ -300,6 +301,24 @@ export default function ArtistProfileEditorPage() {
   // Save Draft
   const handleSaveDraft = () => {
     setStatusMessage(null);
+
+    // Validate social URLs before saving
+    if (instagramUrl.trim()) {
+      const igCheck = validateInstagramUrl(instagramUrl);
+      if (!igCheck.isValid) {
+        setStatusMessage({ type: "error", text: igCheck.error || "Invalid Instagram URL." });
+        return;
+      }
+    }
+
+    if (youtubeUrl.trim()) {
+      const ytCheck = validateYouTubeUrl(youtubeUrl);
+      if (!ytCheck.isValid) {
+        setStatusMessage({ type: "error", text: ytCheck.error || "Invalid YouTube URL." });
+        return;
+      }
+    }
+
     startTransition(async () => {
       const res = await saveArtistProfile({
         stage_name: stageName,
@@ -341,6 +360,24 @@ export default function ArtistProfileEditorPage() {
   // Publish Profile immediately (self-publishing)
   const handlePublish = () => {
     setStatusMessage(null);
+
+    // Validate social URLs before publishing
+    if (instagramUrl.trim()) {
+      const igCheck = validateInstagramUrl(instagramUrl);
+      if (!igCheck.isValid) {
+        setStatusMessage({ type: "error", text: igCheck.error || "Invalid Instagram URL." });
+        return;
+      }
+    }
+
+    if (youtubeUrl.trim()) {
+      const ytCheck = validateYouTubeUrl(youtubeUrl);
+      if (!ytCheck.isValid) {
+        setStatusMessage({ type: "error", text: ytCheck.error || "Invalid YouTube URL." });
+        return;
+      }
+    }
+
     startTransition(async () => {
       // First save current fields
       const saveRes = await saveArtistProfile({
@@ -1112,11 +1149,14 @@ export default function ArtistProfileEditorPage() {
                     placeholder="https://instagram.com/yourhandle"
                     className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:border-purple-600 focus:outline-none"
                   />
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Adds a clickable Instagram icon to your artist card and public profile.
+                  </p>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-gray-700 mb-1.5">
-                    YouTube Channel / Performance Link
+                    YouTube Channel / Video Link
                   </label>
                   <input
                     type="url"
@@ -1125,6 +1165,9 @@ export default function ArtistProfileEditorPage() {
                     placeholder="https://youtube.com/@channel or watch link"
                     className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:border-purple-600 focus:outline-none"
                   />
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Adds a clickable YouTube icon to your artist card and public profile.
+                  </p>
                 </div>
 
                 <div>
