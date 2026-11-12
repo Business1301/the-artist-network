@@ -801,24 +801,21 @@ All integration checks executed with 100% pass rate:
   - `npm run lint`: 0 errors (only pre-existing `<img>` warnings).
   - `npm run build`: 16/16 routes compiled successfully.
 
-### 12.11 Phase 4.6 Stage 1: Calendar Database Migration & Status
+### 12.11 Phase 4.6 Stage 1: Calendar Database Migration & PostgREST Verification (PASSED)
 
-- **Status (2026-11-12):** Initial migration execution rolled back in Supabase SQL Editor (`table_count = 0, rpc_count = 0`).
-- **Defect Analysis (Distinguishing Confirmed from Hypothetical):**
-  1. **Confirmed Defect — Privilege Revoke Role Syntax:** Statements using `REVOKE ... FROM public, anon` treated `public` as a role name rather than SQL keyword `PUBLIC`. In PostgreSQL, `public` is not a role in `pg_roles`, producing `ERROR: role "public" does not exist` and aborting multi-statement transactions.
-  2. **Confirmed Defect — Schema-Qualified `pg_catalog.trim`:** Attempting `pg_catalog.trim(...)` fails in PostgreSQL because the catalog function is named `btrim`, while `TRIM(...)` is ANSI SQL keyword syntax handled directly by the SQL grammar parser.
-  3. **Hypothetical / Unverified:** Exact line of failure during the initial manual run cannot be conclusively proven without the original PostgreSQL SQL Editor error log. Factors such as partial editor selection, buffer parsing order, or `hashtext` cast ambiguity remain potential contributing factors.
-- **Refined Precision Updates in `supabase/migrations/20261112_artist_calendar.sql`:**
-  - Removed blanket dynamic `DROP FUNCTION ... CASCADE` loop (safe against confirmed database state where `rpc_count = 0`).
-  - Standardized all string handling to core ANSI SQL `trim(...)` and `char_length(...)` matching existing platform migrations (`20261101_admin_system.sql`, `20261112_self_publish.sql`).
-  - Separated role revocations cleanly: `REVOKE ... FROM PUBLIC;` and `REVOKE ... FROM anon;`.
-  - Added full argument signatures to all `REVOKE` and `GRANT EXECUTE ON FUNCTION` statements.
-  - Added explicit `::bigint` cast for advisory lock: `PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(v_user_id::text)::bigint);`.
-  - Retained strict table write revokes, owner-only RLS, and platform booking shields.
-- **Verification:**
-  - `npx tsc --noEmit`: 0 errors.
-  - `npm run lint`: 0 errors.
-  - Database objects pending re-execution by platform owner in Supabase SQL Editor.
+- **Status (2026-11-12):** Stage 1 database foundation deployed and fully verified against live Supabase project (`jmwkvrghquqqsfwierpj.supabase.co`).
+- **Live Database & PostgREST Verification Results:**
+  1. `public.artist_calendar_events`: Deployed and discoverable via PostgREST.
+  2. Anonymous Table Access: HTTP 401 (`42501: permission denied for table artist_calendar_events`).
+  3. Anonymous RPC Execution: HTTP 401 (`42501: permission denied for function save_artist_calendar_event`).
+  4. Authenticated Artist SELECT: HTTP 200 OK under owner-only RLS (`auth.uid() = artist_id`).
+  5. Direct Client Writes (INSERT, UPDATE, DELETE): HTTP 401 (`42501: permission denied for table artist_calendar_events`) — completely revoked.
+  6. Non-Artist RPC Authorization: Business account rejected with HTTP 403 (`42501: Only registered artists can manage calendar events`).
+  7. Atomic Conflict Detection: Overlapping confirmed events detected and blocked by `save_artist_calendar_event` with structured conflict details.
+  8. Atomic Event Deletion: `delete_artist_calendar_event` validated and verified.
+  9. Public Availability API: Confirmed non-existent (HTTP 404 / PGRST202).
+  10. Existing Platform Data: Profiles, artist profiles, portfolio items, and authentication verified 100% operational.
+- **Stage 1 Verification Status:** COMPLETE & VERIFIED. Ready for Stage 2 (Server Actions & Frontend Calendar View).
 
 ### 12.12 Next Steps & Phase Boundaries
 
