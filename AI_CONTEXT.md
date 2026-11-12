@@ -801,37 +801,26 @@ All integration checks executed with 100% pass rate:
   - `npm run lint`: 0 errors (only pre-existing `<img>` warnings).
   - `npm run build`: 16/16 routes compiled successfully.
 
-### 12.11 Phase 4.6 Stage 1 Preparation: Calendar Database Migration & RPCs (Ready for Execution)
+### 12.11 Phase 4.6 Stage 1: Calendar Database Migration & Status
 
-- **Scope:** Prepared the complete, transaction-safe database foundation for the artist calendar & availability system without executing live SQL.
-- **Deliverables Prepared:**
-  1. **Migration File (`supabase/migrations/20261112_artist_calendar.sql`):**
-     - Constraints: Standard `TEXT CHECK` matching platform conventions:
-       - `source IN ('external_manual', 'platform_booking')`
-       - `event_type IN ('gig_booking', 'unavailable_block')`
-       - `status IN ('tentative', 'confirmed', 'cancelled', 'completed')`
-     - Table `public.artist_calendar_events`: Timezone-aware (`TIMESTAMPTZ`), strict timing check (`end_time > start_time`), private financial & client columns.
-     - Anti-Tampering Triggers:
-       - `trg_calendar_event_insert_protection`: Verifies caller has `artist` role in `profiles`, ensures `auth.uid() = artist_id`, and blocks client creation of `platform_booking` or forged `platform_inquiry_id`. Clarified error message: "Only registered artists can manage calendar events" (does not require `is_verified`).
-       - `trg_calendar_event_update_protection`: Prevents modifying `artist_id`, `source`, or `platform_inquiry_id`; prevents direct edits to platform-generated bookings.
-       - `trg_calendar_event_delete_protection`: Prevents direct client deletion of platform-generated bookings.
-     - Row Level Security (RLS): Strictly owner-only (`auth.uid() = artist_id`). Zero public/anon grants.
-     - Client Write Privileges Revoked: Direct `INSERT`, `UPDATE`, and `DELETE` on `public.artist_calendar_events` are explicitly revoked from `authenticated` and `anon`/`public`. Authenticated users retain `SELECT` only. All mutations must go through the atomic RPCs.
-     - Atomic Write RPC (`save_artist_calendar_event`): Acquires per-artist advisory lock (`pg_advisory_xact_lock`), runs conflict overlap detection, requires `p_allow_overlap = true` for intentional double-bookings, and handles insert/update in a single transaction.
-     - Atomic Delete RPC (`delete_artist_calendar_event`): Enforces owner match and blocks manual deletion of platform bookings.
-     - Schema Reload Notification: Executes `NOTIFY pgrst, 'reload schema';` immediately after `COMMIT;`.
-  2. **Safe Rollback Procedure (`supabase/migrations/20261112_artist_calendar_rollback.sql`):**
-     - Non-destructive safety latch: Checks row count in `artist_calendar_events`. If rows exist, deliberately aborts unless owner backs up data and explicitly overrides via archival rename (`artist_calendar_events_archive_<timestamp>`).
-- **Date & Time Semantics:**
-  - Standard timezone: `Asia/Kolkata` (IST, UTC+05:30).
-  - Exclusive end timestamps for all-day/multi-day blocks: `[start_time, end_time)` half-open interval.
-  - Full overnight support (e.g. 22:00 to 03:00 next day).
-- **Public Availability Status:**
-  - 100% private in Phase 4.6. No public availability RPCs created. Public calendar availability deferred to Phase 5.
+- **Status (2026-11-12):** Initial migration execution rolled back in Supabase SQL Editor (`table_count = 0, rpc_count = 0`).
+- **Root Cause Analysis:**
+  1. **Privilege Revoke Syntax:** Statements using `REVOKE ... FROM public, anon` mixed PostgreSQL reserved keyword `PUBLIC` with role names, causing role lookup / syntax failure in multi-statement buffer.
+  2. **Unqualified Function Signatures in GRANT/REVOKE:** `REVOKE/GRANT ... ON FUNCTION func_name` without explicit argument types failed when resolving overloaded or existing function signatures (`function not unique`).
+  3. **Advisory Lock Type Match:** `pg_advisory_xact_lock(hashtext(v_user_id::text))` passed `int4` without explicit `::bigint` cast under empty search path.
+  4. **Strict Empty Search Path Resolution:** Built-in JSON and string functions required explicit qualification (`pg_catalog.jsonb_build_object`, `pg_catalog.jsonb_agg`, `pg_catalog.trim`, `pg_catalog.char_length`).
+- **Corrections Applied in `supabase/migrations/20261112_artist_calendar.sql`:**
+  - Added dynamic PL/pgSQL block to pre-emptively drop any prior legacy overloads of `save_artist_calendar_event` and `delete_artist_calendar_event`.
+  - Replaced `FROM public, anon` with standard separated statements: `FROM PUBLIC` and `FROM anon`.
+  - Added full argument signatures to all `REVOKE` and `GRANT EXECUTE ON FUNCTION` statements.
+  - Added explicit `::bigint` cast: `PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(v_user_id::text)::bigint);`.
+  - Schema-qualified all PL/pgSQL built-in function calls with `pg_catalog.`.
+  - Fixed trigger assignment operator (`NEW.updated_at := pg_catalog.now();`).
+  - Retained strict table write revokes, owner-only RLS, and platform booking shields.
 - **Verification:**
-  - Migration SQL reviewed for search path safety (`SET search_path = ''`), security definer constraints, and least privilege.
   - `npx tsc --noEmit`: 0 errors.
   - `npm run lint`: 0 errors.
+  - Database objects pending re-execution by platform owner in Supabase SQL Editor.
 
 ### 12.12 Next Steps & Phase Boundaries
 
