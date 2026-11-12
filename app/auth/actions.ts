@@ -40,6 +40,13 @@ export async function signUpAction(formData: {
 
   const { email, password, role, fullName, contactName, businessName } = formData;
 
+  if (role !== "artist" && role !== "business") {
+    return {
+      success: false,
+      message: "Invalid account role. Registration is only permitted for artists and businesses.",
+    };
+  }
+
   if (!email || !password || password.length < 8) {
     return {
       success: false,

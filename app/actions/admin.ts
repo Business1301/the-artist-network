@@ -370,9 +370,6 @@ export async function getAdminMetrics(): Promise<AdminMetrics> {
   await requireAdmin();
   const supabase = await createClient();
 
-  const { data: { user: currentUser } } = await supabase.auth.getUser();
-  console.log("[ADMIN DEBUG] getAdminMetrics currentUser:", currentUser?.id, currentUser?.email);
-
   // 1. Suspended profiles count
   const { count: suspendedCount, error: suspendedErr } = await supabase
     .from("artist_profiles")
@@ -382,8 +379,6 @@ export async function getAdminMetrics(): Promise<AdminMetrics> {
   if (suspendedErr) {
     throw new Error(`Database error querying suspended profiles: ${suspendedErr.message}`);
   }
-
-  console.log("[ADMIN DEBUG] suspendedCount from DB:", suspendedCount);
 
   // 2. Published artists count
   const { count: publishedCount, error: publishedErr } = await supabase
@@ -470,9 +465,6 @@ export async function getArtistApplications(
   await requireAdmin();
   const supabase = await createClient();
 
-  const { data: { user: currentUser } } = await supabase.auth.getUser();
-  console.log("[ADMIN DEBUG] getArtistApplications currentUser:", currentUser?.id, currentUser?.email);
-
   let query = supabase
     .from("artist_profiles")
     .select(
@@ -509,8 +501,6 @@ export async function getArtistApplications(
   }
 
   const { data, error } = await query;
-
-  console.log("[ADMIN DEBUG] getArtistApplications statusFilter:", statusFilter, "count:", data?.length, "error:", error?.message);
 
   if (error) {
     throw new Error(`Database error querying artist applications: ${error.message}`);

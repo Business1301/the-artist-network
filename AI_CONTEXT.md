@@ -1048,10 +1048,47 @@ All integration checks executed with 100% pass rate:
   - `npm run lint`: **0 errors** (9 pre-existing `<img>` warnings unchanged).
   - `npm run build`: **17/17 routes generated successfully**.
 
-### 12.18 Phase Boundaries & Handover
+### 12.18 Pre-Launch Security Audit & Fixes (COMPLETED)
+
+- **Audit & Hardening (2026-11-12):**
+  - Completed comprehensive pre-launch security audit across Next.js 16 App Router, React 19, Supabase Auth, PostgreSQL RLS, storage, and dependencies.
+  - Full report documented in `PRE_LAUNCH_SECURITY_AUDIT.md`.
+  - **Task 1 — Sensitive Admin Debug Logs Removed (`app/actions/admin.ts`):**
+    - Removed 4 `[ADMIN DEBUG]` `console.log` statements logging admin user IDs and emails to server logs.
+    - Removed redundant `auth.getUser()` calls in `getAdminMetrics` and `getArtistApplications`.
+    - Zero `console.log` / `console.debug` remaining in application code.
+  - **Task 2 — HTTP Security Headers Added (`next.config.ts`):**
+    - `X-Frame-Options: DENY` (anti-clickjacking).
+    - `X-Content-Type-Options: nosniff` (anti-MIME-sniffing).
+    - `Referrer-Policy: strict-origin-when-cross-origin`.
+    - `Permissions-Policy: camera=(), microphone=(), geolocation=(), browsing-topics=()`.
+    - Verified directly on live HTTP responses (Status 200).
+  - **Task 3 — Signup Role Hardening (`app/auth/actions.ts`):**
+    - Added explicit runtime whitelist in `signUpAction`: only `'artist'` and `'business'` permitted.
+    - Any unexpected or unauthorized role (such as `'admin'`) is rejected immediately with an explicit validation error.
+    - Verified database `handle_new_user()` trigger restricts metadata role assignment to `'business'` or defaults to `'artist'`.
+  - **Task 4 — Public Profile Field Privacy & RLS Verification:**
+    - Live tests confirmed anonymous users receive 0 rows from `public.profiles` (legal names completely shielded).
+    - Unpublished, draft, suspended, and rejected artist records return 0 rows to anonymous users.
+    - Published artist records return `rejection_reason: null`.
+  - **Task 5 — Session Cookie Security Audit:**
+    - Audited `@supabase/ssr` default cookie configuration (`sameSite: "lax"`, `path: "/"`, `maxAge: 400 days`).
+    - Documented reason for `httpOnly: false` default in `@supabase/ssr` (browser client synchronization).
+  - **Task 6 — Secret & Dependency Audit:**
+    - `npm audit --omit=dev` confirms **0 production vulnerabilities**.
+    - No secrets or `.env*` files in git history.
+    - Only public URL and anon key used via `NEXT_PUBLIC_` variables.
+  - **Task 7 — Regression Testing:**
+    - `npx tsc --noEmit`: 0 errors.
+    - `npm run lint`: 0 errors (9 pre-existing `<img>` warnings unchanged).
+    - `npm run build`: 17/17 routes compiled cleanly in 815ms.
+    - Live runtime regression suite (`scratch/verify_runtime_regression.mjs`): **16/16 PASSED**.
+
+### 12.19 Phase Boundaries & Handover
 
 - **Phase 4.6 (Artist Calendar & Availability):** ✅ FULLY COMPLETED & LIVE-VERIFIED.
 - **Social Media Links (Discovery & Profiles):** ✅ FULLY COMPLETED.
+- **Pre-Launch Security Audit & Fixes:** ✅ FULLY COMPLETED & VERIFIED.
 - **Phase 5 (Public Enquiries & Booking Workflow):** ⛔ STRICTLY BLOCKED — DO NOT START until explicit user sign-off.
 
 
