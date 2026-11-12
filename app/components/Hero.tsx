@@ -1,7 +1,12 @@
 import Link from "next/link";
 import SearchBar from "./SearchBar";
+import type { CurrentUser } from "@/app/auth/actions";
 
-export default function Hero() {
+interface HeroProps {
+  user?: CurrentUser | null;
+}
+
+export default function Hero({ user }: HeroProps) {
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-purple-950 via-purple-900 to-indigo-900 pt-16">
 
@@ -46,12 +51,37 @@ export default function Hero() {
           >
             Discover Artists
           </Link>
-          <Link
-            href="/signup"
-            className="w-full sm:w-auto px-8 py-4 bg-white/10 backdrop-blur-sm border border-white/30 text-white font-bold text-base rounded-full hover:bg-white/20 hover:scale-105 transition-all inline-block"
-          >
-            Join as an Artist
-          </Link>
+          {user ? (
+            user.role === "artist" ? (
+              <Link
+                href="/dashboard/artist"
+                className="w-full sm:w-auto px-8 py-4 bg-white/10 backdrop-blur-sm border border-white/30 text-white font-bold text-base rounded-full hover:bg-white/20 hover:scale-105 transition-all inline-block"
+              >
+                Artist Dashboard
+              </Link>
+            ) : user.role === "business" ? (
+              <Link
+                href="/dashboard/restaurant"
+                className="w-full sm:w-auto px-8 py-4 bg-white/10 backdrop-blur-sm border border-white/30 text-white font-bold text-base rounded-full hover:bg-white/20 hover:scale-105 transition-all inline-block"
+              >
+                Business Dashboard
+              </Link>
+            ) : (
+              <Link
+                href="/admin"
+                className="w-full sm:w-auto px-8 py-4 bg-white/10 backdrop-blur-sm border border-white/30 text-white font-bold text-base rounded-full hover:bg-white/20 hover:scale-105 transition-all inline-block"
+              >
+                Admin Dashboard
+              </Link>
+            )
+          ) : (
+            <Link
+              href="/signup"
+              className="w-full sm:w-auto px-8 py-4 bg-white/10 backdrop-blur-sm border border-white/30 text-white font-bold text-base rounded-full hover:bg-white/20 hover:scale-105 transition-all inline-block"
+            >
+              Join as an Artist
+            </Link>
+          )}
         </div>
 
         {/* Search Bar */}

@@ -6,11 +6,14 @@ import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import ArtistCard from "@/app/components/ArtistCard";
 import DirectoryFilters from "@/app/components/DirectoryFilters";
-import { getCurrentUser } from "@/app/auth/actions";
+import ArtistCTA from "@/app/components/ArtistCTA";
+import { getCurrentUser, type CurrentUser } from "@/app/auth/actions";
 import {
   getPublishedArtists,
   getPublishedCategoriesAndCities,
+  getCurrentArtistStatus,
   ArtistDiscoveryFilters,
+  type ArtistCTAStatus,
 } from "@/lib/data/artists";
 import { DEMO_SHOWCASE_ARTISTS } from "@/lib/data/demoArtists";
 
@@ -75,7 +78,16 @@ function parsePriceRange(priceSlug?: string): { minPrice?: number; maxPrice?: nu
   }
 }
 
-async function DirectoryContent({ searchParams }: PageProps) {
+interface DirectoryContentProps extends PageProps {
+  currentUser: CurrentUser | null;
+  artistStatus: ArtistCTAStatus | null;
+}
+
+async function DirectoryContent({
+  searchParams,
+  currentUser,
+  artistStatus,
+}: DirectoryContentProps) {
   await connection();
   const params = await searchParams;
 
@@ -320,21 +332,13 @@ async function DirectoryContent({ searchParams }: PageProps) {
           </div>
         )}
 
-        {/* Bottom Call to Action for Artists */}
-        <div className="mt-16 bg-gradient-to-r from-purple-900 via-indigo-900 to-purple-950 rounded-3xl p-8 sm:p-10 text-white text-center shadow-xl">
-          <h3 className="text-xl sm:text-2xl font-bold mb-2">
-            Are you an artist looking for gigs and clients?
-          </h3>
-          <p className="text-purple-200 text-xs sm:text-sm max-w-xl mx-auto mb-6">
-            Join The Artist Network to create your profile, upload your portfolio, and get discovered by top restaurants, corporate planners, and venues.
-          </p>
-          <Link
-            href="/signup"
-            className="inline-block px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md hover:scale-105 transition-transform"
-          >
-            Create Artist Profile →
-          </Link>
-        </div>
+        {/* Bottom Call to Action */}
+        <ArtistCTA
+          user={currentUser}
+          artistStatus={artistStatus}
+          variant="embedded"
+          className="mt-16"
+        />
 
       </div>
     </main>
@@ -361,12 +365,20 @@ function DirectoryLoadingSkeleton() {
 export default async function ArtistsPage(props: PageProps) {
   await connection();
   const currentUser = await getCurrentUser();
+  const artistStatus =
+    currentUser?.role === "artist"
+      ? await getCurrentArtistStatus(currentUser.id)
+      : null;
 
   return (
     <>
       <Navbar initialUser={currentUser} />
       <Suspense fallback={<DirectoryLoadingSkeleton />}>
-        <DirectoryContent searchParams={props.searchParams} />
+        <DirectoryContent
+          searchParams={props.searchParams}
+          currentUser={currentUser}
+          artistStatus={artistStatus}
+        />
       </Suspense>
       <Footer />
     </>

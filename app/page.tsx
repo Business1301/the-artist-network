@@ -10,12 +10,17 @@ import ForBusinesses from "./components/ForBusinesses";
 import ArtistCTA from "./components/ArtistCTA";
 import Footer from "./components/Footer";
 import { getCurrentUser } from "./auth/actions";
+import { getCurrentArtistStatus } from "@/lib/data/artists";
 
 export const instant = false;
 
 export default async function HomePage() {
   await connection();
   const currentUser = await getCurrentUser();
+  const artistStatus =
+    currentUser?.role === "artist"
+      ? await getCurrentArtistStatus(currentUser.id)
+      : null;
 
   return (
     <>
@@ -24,7 +29,7 @@ export default async function HomePage() {
 
       <main className="flex-1">
         {/* 2 & 3. Hero and Search */}
-        <Hero />
+        <Hero user={currentUser} />
 
         {/* 4. Browse Categories */}
         <ArtistCategories />
@@ -45,7 +50,7 @@ export default async function HomePage() {
         <ForBusinesses />
 
         {/* 9. Artist Call to Action */}
-        <ArtistCTA />
+        <ArtistCTA user={currentUser} artistStatus={artistStatus} />
       </main>
 
       {/* 10. Footer */}

@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Navbar from "../../components/Navbar";
-import Footer from "../../components/Footer";
+
 import { getArtistProfile, ArtistProfileData, PortfolioItemData } from "@/app/actions/artist";
 import { createClient } from "@/lib/supabase/client";
 
@@ -133,20 +132,18 @@ export default function ArtistDashboardPage() {
     setTimeout(() => setActionAlert(null), 4000);
   };
 
-  // Calculate real completion score
+  // Calculate real completion score (0 to 100%) based strictly on completed fields
   const calculateCompleteness = () => {
     if (!profile) return 0;
     let score = 0;
     if (profile.stage_name?.trim()) score += 15;
-    if (profile.category) score += 10;
+    if (profile.category?.trim()) score += 10;
     if (profile.city?.trim()) score += 10;
     if (profile.bio && profile.bio.trim().length >= 30) score += 20;
     if (profile.starting_price && Number(profile.starting_price) > 0) score += 15;
-    if (profile.genres?.length > 0) score += 10;
-    if (profile.specialities?.length > 0) score += 5;
+    if (profile.genres && profile.genres.length > 0) score += 10;
     if (profile.profile_image_url?.trim()) score += 10;
-    if (profile.instagram_url?.trim() || profile.youtube_url?.trim()) score += 5;
-    if (portfolio.length > 0) score += 10;
+    if (portfolio && portfolio.length > 0) score += 10;
     return Math.min(score, 100);
   };
 
@@ -154,23 +151,17 @@ export default function ArtistDashboardPage() {
 
   if (isLoading) {
     return (
-      <>
-        <Navbar />
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin" />
-            <p className="text-xs text-gray-500 font-semibold">Loading artist workspace...</p>
-          </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs text-gray-500 font-semibold">Loading artist workspace...</p>
         </div>
-        <Footer />
-      </>
+      </div>
     );
   }
 
   return (
     <>
-      <Navbar />
-
       <main className="min-h-screen bg-gray-50 pt-20 pb-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
@@ -609,8 +600,6 @@ export default function ArtistDashboardPage() {
           )}
         </div>
       </main>
-
-      <Footer />
     </>
   );
 }

@@ -3,8 +3,6 @@
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Navbar from "@/app/components/Navbar";
-import Footer from "@/app/components/Footer";
 import PortfolioManager from "@/app/components/PortfolioManager";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -93,22 +91,22 @@ export default function ArtistProfileEditorPage() {
     text: string;
   } | null>(null);
 
-  // Form State
+  // Form State — Clean initial values (no placeholder bias for new artists)
   const [stageName, setStageName] = useState("");
-  const [category, setCategory] = useState(CATEGORIES[0]);
-  const [city, setCity] = useState("Mumbai");
-  const [state, setState] = useState("Maharashtra");
+  const [category, setCategory] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
   const [country, setCountry] = useState("India");
   const [bio, setBio] = useState("");
-  const [experienceYears, setExperienceYears] = useState(3);
+  const [experienceYears, setExperienceYears] = useState<number | "">("");
   const [startingPrice, setStartingPrice] = useState<number | "">("");
   const [pricingUnit, setPricingUnit] = useState<"per hour" | "per performance" | "per event">(
     "per performance"
   );
   const [genres, setGenres] = useState<string[]>([]);
   const [specialities, setSpecialities] = useState<string[]>([]);
-  const [languages, setLanguages] = useState<string[]>(["Hindi", "English"]);
-  const [technicalRequirements, setTechnicalRequirements] = useState<string[]>(DEFAULT_TECHNICAL_REQUIREMENTS);
+  const [languages, setLanguages] = useState<string[]>([]);
+  const [technicalRequirements, setTechnicalRequirements] = useState<string[]>([]);
   const [customRequirement, setCustomRequirement] = useState("");
   const [profileImageUrl, setProfileImageUrl] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
@@ -149,22 +147,18 @@ export default function ArtistProfileEditorPage() {
         const p = res.profile;
         setExistingProfile(p);
         setStageName(p.stage_name || "");
-        setCategory(p.category || CATEGORIES[0]);
-        setCity(p.city || "Mumbai");
-        setState(p.state || "Maharashtra");
+        setCategory(p.category || "");
+        setCity(p.city || "");
+        setState(p.state || "");
         setCountry(p.country || "India");
         setBio(p.bio || "");
-        setExperienceYears(p.experience_years || 0);
-        setStartingPrice(p.starting_price || "");
+        setExperienceYears(p.experience_years !== null && p.experience_years !== undefined ? p.experience_years : "");
+        setStartingPrice(p.starting_price !== null && p.starting_price !== undefined ? p.starting_price : "");
         setPricingUnit(p.pricing_unit || "per performance");
         setGenres(p.genres || []);
         setSpecialities(p.specialities || []);
-        setLanguages(p.languages || ["Hindi", "English"]);
-        if (p.technical_requirements !== undefined && p.technical_requirements !== null) {
-          setTechnicalRequirements(p.technical_requirements);
-        } else {
-          setTechnicalRequirements(DEFAULT_TECHNICAL_REQUIREMENTS);
-        }
+        setLanguages(p.languages || []);
+        setTechnicalRequirements(p.technical_requirements || []);
         setProfileImageUrl(p.profile_image_url || "");
         setCoverImageUrl(p.cover_image_url || "");
         setInstagramUrl(p.instagram_url || "");
@@ -179,18 +173,17 @@ export default function ArtistProfileEditorPage() {
     loadData();
   }, [router]);
 
-  // Calculate profile completeness score (0 to 100%)
+  // Calculate profile completeness score (0 to 100%) based strictly on completed fields
   const calculateCompleteness = () => {
     let score = 0;
     if (stageName.trim()) score += 15;
-    if (category) score += 10;
+    if (category.trim()) score += 10;
     if (city.trim()) score += 10;
     if (bio.trim().length >= 30) score += 20;
-    if (startingPrice && Number(startingPrice) > 0) score += 15;
+    if (startingPrice !== "" && Number(startingPrice) > 0) score += 15;
     if (genres.length > 0) score += 10;
-    if (specialities.length > 0) score += 5;
     if (profileImageUrl.trim()) score += 10;
-    if (instagramUrl.trim() || youtubeUrl.trim()) score += 5;
+    if (portfolio.length > 0) score += 10;
     return Math.min(score, 100);
   };
 
@@ -407,16 +400,12 @@ export default function ArtistProfileEditorPage() {
 
   if (isLoading) {
     return (
-      <>
-        <Navbar />
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin" />
-            <p className="text-xs text-gray-500 font-semibold">Loading your artist profile...</p>
-          </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-3 border-purple-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs text-gray-500 font-semibold">Loading your artist profile...</p>
         </div>
-        <Footer />
-      </>
+      </div>
     );
   }
 
@@ -426,10 +415,7 @@ export default function ArtistProfileEditorPage() {
   const isRejected = existingProfile?.profile_status === "rejected";
 
   return (
-    <>
-      <Navbar />
-
-      <main className="min-h-screen bg-gray-50 text-gray-900 pt-20 pb-20">
+    <main className="min-h-screen bg-gray-50 text-gray-900 pt-20 pb-20">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* User Status / Account Bar */}
           <div className="mb-6 mt-4 p-4 rounded-2xl bg-white border border-gray-200/80 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-gray-700">
@@ -1236,8 +1222,5 @@ export default function ArtistProfileEditorPage() {
           </form>
         </div>
       </main>
-
-      <Footer />
-    </>
   );
 }

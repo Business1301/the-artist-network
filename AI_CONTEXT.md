@@ -742,7 +742,32 @@ All integration checks executed with 100% pass rate:
   8. **Admin RPC Authorization Gate:** PASS ✅ — Anonymous, artist, and business attempts to call `admin_moderate_artist_profile` all rejected with `42501` / permission denied.
 - **Verification:** TypeScript: 0 errors, ESLint: 0 errors, Production build: 16/16 routes compiled cleanly.
 
-### 12.8 Next Steps & Phase Boundaries
+### 12.9 Authentication-Aware Public CTAs & Page Audit (Completed)
+
+- **Issue:** Homepage and Artists Directory presented generic "Join as an Artist" / "Create Artist Profile" signup CTAs to already authenticated artists, business users, and administrators.
+- **Solution:**
+  1. **Authentication-Aware CTA Component (`app/components/ArtistCTA.tsx`):**
+     - **Logged-out visitor:** Displays standard promotional CTA ("Showcase Your Talent to People Who Want to Hire You", "Join as an Artist" → `/signup`, "How It Works for Artists" → `/#how-it-works`).
+     - **Logged-in artist (no profile or unpublished draft):** Displays "Complete Your Artist Profile", primary button "Continue Profile Setup" → `/dashboard/artist/edit`, secondary button "Artist Dashboard" → `/dashboard/artist`.
+     - **Logged-in artist (published profile):** Displays "Your Artist Profile Is Live", primary button "Manage My Profile" → `/dashboard/artist`, secondary button "View Public Profile" → `/artists/[slug]`.
+     - **Logged-in artist (suspended profile):** Displays account notice "Your Artist Profile Is Suspended", primary button "View Profile Status" → `/dashboard/artist`. Does not encourage republishing while suspended.
+     - **Logged-in artist (pending review):** Displays "Your Artist Profile Is Under Review", button "View Application Status" → `/dashboard/artist`.
+     - **Logged-in business user:** Displays business discovery CTA ("Find & Hire Exceptional Artists", "Discover Artists" → `/artists`, "Venue Dashboard" → `/dashboard/restaurant`).
+     - **Logged-in admin:** Displays admin control center ("Admin Control Center", "Open Admin Dashboard" → `/admin`, "Review Applications" → `/admin/applications`).
+  2. **RLS Data Query Optimization (`lib/data/artists.ts`):**
+     - Added `getCurrentArtistStatus(userId)`: Scoped strictly to `auth.uid() = id` via RLS; fetches only `profile_status, slug`.
+     - Zero extra queries executed when user is anonymous, business, or admin.
+     - Homepage and Artists Directory pass server-fetched `currentUser` and `artistStatus` down as props, avoiding duplicate DB roundtrips.
+  3. **Audit of Other Public Pages:**
+     - **Homepage Hero (`app/components/Hero.tsx`):** Secondary CTA adapts to role: logged-out → "Join as an Artist" (`/signup`); artist → "Artist Dashboard" (`/dashboard/artist`); business → "Business Dashboard" (`/dashboard/restaurant`); admin → "Admin Dashboard" (`/admin`).
+     - **Artists Directory (`app/artists/page.tsx`):** Replaced static signup CTA block with `<ArtistCTA variant="embedded" user={currentUser} artistStatus={artistStatus} />`.
+     - **Dashboard Artist Edit (`app/dashboard/artist/edit/page.tsx`):** Removed redundant duplicate `<Navbar />` and `<Footer />` calls (which are already cleanly provided by `ArtistDashboardLayout`).
+  4. **Verification:**
+     - `npx tsc --noEmit`: 0 errors.
+     - `npm run lint`: 0 errors.
+     - `npm run build`: 16/16 routes compiled successfully.
+
+### 12.10 Next Steps & Phase Boundaries
 
 - **Phase 4.5 Stage 3 Final Sign-off:** Self-publishing verification complete. Test artist `Demo Test Artist` is published and available for owner suspension/reinstatement smoke test in `/admin/applications`.
 - **Phase 5:** NOT STARTED (Strict rule: Phase 5 remains blocked until explicit user sign-off).

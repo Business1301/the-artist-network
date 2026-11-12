@@ -272,8 +272,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       .getAll()
       .some(
         (c) =>
-          c.name.includes("-auth-token") ||
-          (c.name.startsWith("sb-") && c.name.endsWith("-token"))
+          c.name.startsWith("sb-") ||
+          c.name.includes("-auth-token")
       );
 
     if (!hasAuthCookie) {

@@ -269,3 +269,43 @@ export async function getPublishedCategoriesAndCities(): Promise<{
   return { categories, cities };
 }
 
+export interface ArtistCTAStatus {
+  profile_status: "draft" | "published" | "suspended" | "pending_review" | "rejected";
+  slug: string | null;
+}
+
+/**
+ * Lightweight helper to fetch the authenticated artist's profile status and slug.
+ * Scoped strictly to auth.uid() via RLS; avoids pulling heavy portfolio or sensitive data.
+ */
+export async function getCurrentArtistStatus(userId: string): Promise<ArtistCTAStatus | null> {
+  if (!isSupabaseConfigured() || !userId) {
+    return null;
+  }
+
+  try {
+    const supabase = await createClient();
+    const query = supabase
+      .from("artist_profiles")
+      .select("profile_status, slug")
+      .eq("id", userId)
+      .maybeSingle();
+
+    const { data, error } = await withQueryTimeout<{
+      profile_status: ArtistCTAStatus["profile_status"];
+      slug: string | null;
+    } | null>(query, 5000, "artist CTA status lookup");
+
+    if (error || !data) {
+      return null;
+    }
+
+    return {
+      profile_status: data.profile_status,
+      slug: data.slug || null,
+    };
+  } catch {
+    return null;
+  }
+}
+
