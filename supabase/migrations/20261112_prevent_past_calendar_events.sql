@@ -4,11 +4,12 @@
 -- 
 -- DESCRIPTION:
 --   Updates the save_artist_calendar_event RPC to enforce database-level
---   protection against past-date bookings:
+--   protection against past-date bookings and historical event modification:
 --   1. Rejects creation of any new booking whose start_time <= clock_timestamp()
---   2. Rejects rescheduling existing events to a past start_time
---   3. Explicitly allows metadata-only updates (notes, fees, contacts, venue)
---      on existing historical events without rescheduling.
+--   2. For events that have already started (start_time <= clock_timestamp()),
+--      strictly forbids modifying scheduling fields (start_time, end_time, is_all_day).
+--      Allows editing metadata (notes, venue, contacts, fee, deposit, title, status).
+--   3. For future events, strictly rejects rescheduling start_time to a past timestamp.
 --
 -- STATUS:
 --   PREPARED FOR OWNER REVIEW — DO NOT AUTO-EXECUTE.
@@ -98,9 +99,24 @@ BEGIN
       RETURN jsonb_build_object('success', false, 'error', 'Platform-generated bookings cannot be modified manually');
     END IF;
 
-    -- Rescheduling protection: if start_time is changed, new time must be in the future
-    IF p_start_time <> v_existing_event.start_time AND p_start_time <= pg_catalog.clock_timestamp() THEN
-      RETURN jsonb_build_object('success', false, 'error', 'Rescheduled events must start in the future. Please select a later date or time.');
+    -- Once an event has started, do not permit changes to start_time, end_time, or is_all_day
+    IF v_existing_event.start_time <= pg_catalog.clock_timestamp() THEN
+      IF p_start_time <> v_existing_event.start_time 
+         OR p_end_time <> v_existing_event.end_time 
+         OR p_is_all_day <> v_existing_event.is_all_day THEN
+        RETURN jsonb_build_object(
+          'success', false,
+          'error', 'Scheduling details (start time, end time, and all-day setting) cannot be modified for events that have already started or concluded.'
+        );
+      END IF;
+    ELSE
+      -- For future events being rescheduled, new start_time must strictly be in the future
+      IF p_start_time <> v_existing_event.start_time AND p_start_time <= pg_catalog.clock_timestamp() THEN
+        RETURN jsonb_build_object(
+          'success', false,
+          'error', 'Rescheduled events must start in the future. Please select a later date or time.'
+        );
+      END IF;
     END IF;
   ELSE
     -- Creation protection: new bookings must strictly start in the future
@@ -212,7 +228,7 @@ BEGIN
 END;
 $$;
 
--- Permissions on save RPC
+-- Permissions on save RPC (Explicit signatures and isolated role grants)
 REVOKE ALL ON FUNCTION public.save_artist_calendar_event(
   UUID, TEXT, TEXT, TEXT, TIMESTAMPTZ, TIMESTAMPTZ, BOOLEAN, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, TEXT, BOOLEAN
 ) FROM PUBLIC;

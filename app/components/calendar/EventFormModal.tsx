@@ -150,6 +150,7 @@ export default function EventFormModal({
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [isPastBooking, setIsPastBooking] = useState(false);
+  const [isStartedEvent, setIsStartedEvent] = useState(false);
   const [conflictPending, setConflictPending] = useState<{
     conflicts: ConflictingEvent[];
     payload: unknown;
@@ -161,6 +162,15 @@ export default function EventFormModal({
   // Helper to determine if a form state represents a past booking
   const evaluateIsPast = useCallback(
     (currentForm: FormState): boolean => {
+      // Historical events that have already started are permitted to update metadata
+      if (
+        mode === "edit" &&
+        initialData?.start_time &&
+        new Date(initialData.start_time).getTime() <= Date.now()
+      ) {
+        return false;
+      }
+
       const startIso = currentForm.is_all_day
         ? istToUtcIso(currentForm.start_date, "00:00")
         : istToUtcIso(currentForm.start_date, currentForm.start_time || "00:00");
@@ -181,8 +191,15 @@ export default function EventFormModal({
     if (isOpen && !wasOpenRef.current) {
       wasOpenRef.current = true;
       const initial = buildInitialForm(mode, eventType, initialData, defaultDate);
+      const started =
+        mode === "edit" &&
+        Boolean(
+          initialData?.start_time &&
+            new Date(initialData.start_time).getTime() <= Date.now()
+        );
+      setIsStartedEvent(started);
       setForm(initial);
-      setIsPastBooking(evaluateIsPast(initial));
+      setIsPastBooking(started ? false : evaluateIsPast(initial));
       setIsSaving(false);
       setGlobalError(null);
       setFieldErrors({});
@@ -235,6 +252,7 @@ export default function EventFormModal({
     : "Bookings must start in the future. Please select a later date or time.";
 
   function toggleAllDay() {
+    if (isStartedEvent) return;
     const nextAllDay = !form.is_all_day;
     setForm((prev) => {
       let nextStartDate = prev.start_date;
@@ -262,6 +280,35 @@ export default function EventFormModal({
   if (!isOpen) return null;
 
   function buildPayload(allowOverlap: boolean) {
+    if (isStartedEvent && initialData) {
+      // Historical event: strictly preserve existing scheduling fields
+      return {
+        event_id: initialData.id,
+        title: form.title.trim(),
+        event_type: form.event_type,
+        status: form.status,
+        start_time: initialData.start_time,
+        end_time: initialData.end_time,
+        is_all_day: initialData.is_all_day,
+        city: form.city.trim() || null,
+        venue_name: form.venue_name.trim() || null,
+        venue_address: form.venue_address.trim() || null,
+        client_name: isBlocked ? null : form.client_name.trim() || null,
+        client_phone: isBlocked ? null : form.client_phone.trim() || null,
+        client_email: isBlocked ? null : form.client_email.trim() || null,
+        agreed_fee:
+          !isBlocked && form.agreed_fee !== ""
+            ? parseFloat(form.agreed_fee)
+            : null,
+        deposit_paid:
+          !isBlocked && form.deposit_paid !== ""
+            ? parseFloat(form.deposit_paid)
+            : null,
+        private_notes: form.private_notes.trim() || null,
+        allow_overlap: allowOverlap,
+      };
+    }
+
     // All times interpreted as IST
     const startIso = form.is_all_day
       ? istToUtcIso(form.start_date, "00:00")
@@ -316,27 +363,29 @@ export default function EventFormModal({
     setGlobalError(null);
     setFieldErrors({});
 
-    // Immediate client-side revalidation at exact moment of submit
-    const submitStartIso = form.is_all_day
-      ? istToUtcIso(form.start_date, "00:00")
-      : istToUtcIso(form.start_date, form.start_time);
+    // Immediate client-side revalidation at exact moment of submit (skip for started events)
+    if (!isStartedEvent) {
+      const submitStartIso = form.is_all_day
+        ? istToUtcIso(form.start_date, "00:00")
+        : istToUtcIso(form.start_date, form.start_time);
 
-    const isStartTimeChangedAtSubmit =
-      !isEdit || !initialData
-        ? true
-        : new Date(submitStartIso).getTime() !==
-          new Date(initialData.start_time).getTime();
+      const isStartTimeChangedAtSubmit =
+        !isEdit || !initialData
+          ? true
+          : new Date(submitStartIso).getTime() !==
+            new Date(initialData.start_time).getTime();
 
-    if (
-      isStartTimeChangedAtSubmit &&
-      new Date(submitStartIso).getTime() <= Date.now()
-    ) {
-      const msg = form.is_all_day
-        ? "All-day bookings must be scheduled for future dates (tomorrow or later). Today's midnight has already passed."
-        : "Bookings must start in the future. Please select a later date or time.";
-      setGlobalError(msg);
-      setFieldErrors({ start_time: [msg] });
-      return;
+      if (
+        isStartTimeChangedAtSubmit &&
+        new Date(submitStartIso).getTime() <= Date.now()
+      ) {
+        const msg = form.is_all_day
+          ? "All-day bookings must be scheduled for future dates (tomorrow or later). Today's midnight has already passed."
+          : "Bookings must start in the future. Please select a later date or time.";
+        setGlobalError(msg);
+        setFieldErrors({ start_time: [msg] });
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -492,16 +541,32 @@ export default function EventFormModal({
                 </div>
               )}
 
+              {/* Historical Event Notice */}
+              {isStartedEvent && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-900 flex items-start gap-2.5">
+                  <span className="shrink-0 text-base">🔒</span>
+                  <div>
+                    <p className="font-semibold text-amber-950">
+                      Historical Event — Scheduling Locked
+                    </p>
+                    <p className="mt-0.5 text-amber-800">
+                      This event has already started or concluded. Date, time, and all-day settings cannot be modified. You may update notes, venue, client details, fee, deposit, and status.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* All Day Toggle */}
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   role="switch"
+                  disabled={isStartedEvent}
                   aria-checked={form.is_all_day}
                   onClick={toggleAllDay}
                   className={`relative w-9 h-5 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-400 ${
                     form.is_all_day ? "bg-purple-600" : "bg-gray-300"
-                  }`}
+                  } ${isStartedEvent ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
                   <span
                     className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${
@@ -509,7 +574,13 @@ export default function EventFormModal({
                     }`}
                   />
                 </button>
-                <span className="text-xs font-semibold text-gray-700">All-day event</span>
+                <span
+                  className={`text-xs font-semibold ${
+                    isStartedEvent ? "text-gray-400" : "text-gray-700"
+                  }`}
+                >
+                  All-day event {isStartedEvent && "(locked)"}
+                </span>
               </div>
 
               {/* Date / Time Row */}
@@ -521,10 +592,13 @@ export default function EventFormModal({
                   <input
                     type="date"
                     value={form.start_date}
+                    disabled={isStartedEvent}
                     min={!isEdit ? (form.is_all_day ? tomorrowStr : todayStr) : undefined}
                     onChange={(e) => setField("start_date", e.target.value)}
                     required
-                    className={`${inputCls} mt-1`}
+                    className={`${inputCls} mt-1 ${
+                      isStartedEvent ? "opacity-60 bg-gray-100 cursor-not-allowed" : ""
+                    }`}
                   />
                   <FieldError errors={fieldErrors} field="start_time" />
                 </div>
@@ -536,10 +610,13 @@ export default function EventFormModal({
                   <input
                     type="date"
                     value={form.end_date}
+                    disabled={isStartedEvent}
                     min={form.start_date}
                     onChange={(e) => setField("end_date", e.target.value)}
                     required
-                    className={`${inputCls} mt-1`}
+                    className={`${inputCls} mt-1 ${
+                      isStartedEvent ? "opacity-60 bg-gray-100 cursor-not-allowed" : ""
+                    }`}
                   />
                   <FieldError errors={fieldErrors} field="end_time" />
                 </div>
@@ -552,8 +629,11 @@ export default function EventFormModal({
                     <input
                       type="time"
                       value={form.start_time}
+                      disabled={isStartedEvent}
                       onChange={(e) => setField("start_time", e.target.value)}
-                      className={`${inputCls} mt-1`}
+                      className={`${inputCls} mt-1 ${
+                        isStartedEvent ? "opacity-60 bg-gray-100 cursor-not-allowed" : ""
+                      }`}
                     />
                   </div>
                   <div>
@@ -561,8 +641,11 @@ export default function EventFormModal({
                     <input
                       type="time"
                       value={form.end_time}
+                      disabled={isStartedEvent}
                       onChange={(e) => setField("end_time", e.target.value)}
-                      className={`${inputCls} mt-1`}
+                      className={`${inputCls} mt-1 ${
+                        isStartedEvent ? "opacity-60 bg-gray-100 cursor-not-allowed" : ""
+                      }`}
                     />
                   </div>
                 </div>

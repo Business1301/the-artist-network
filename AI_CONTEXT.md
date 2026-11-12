@@ -931,40 +931,56 @@ All integration checks executed with 100% pass rate:
   - `npm run lint`: 0 errors (9 pre-existing `<img>` warnings unchanged).
   - `npm run build`: Exit code 0, 17/17 pages generated successfully.
 
-### 12.15 Phase 4.6 Calendar Bug Fix: Prevent Past-Date Bookings (COMPLETED)
+### 12.15 Phase 4.6 Calendar Bug Fix: Prevent Past-Date Bookings & Historical Event Rules (COMPLETED)
 
-- **Issue Reported (2026-11-12):** During manual testing, an artist could schedule new bookings or unavailable blocks for dates and times that had already passed.
+- **Issue Addressed (2026-11-12):**
+  1. Artists could schedule new bookings or unavailable blocks for dates and times that had already passed.
+  2. Clear rules were needed for historical events: once an event has started (`start_time <= now`), scheduling fields (`start_time`, `end_time`, `is_all_day`) must be immutable, while metadata (notes, venue, client details, fee, deposit, and status) can still be edited.
+
 - **Solution & Enforcement Architecture:**
-  - **Client-Side Real-Time Validation (`EventFormModal.tsx`):**
+  - **Client-Side Real-Time Validation & UI State (`EventFormModal.tsx`):**
     - Input `min` attribute set on `start_date` (`getTomorrowIstDateStr()` for all-day events, `getTodayIstDateStr()` for timed events).
     - Intelligent initial timings via `getDefaultFutureIstTimings()`: defaults to future hours today (or tomorrow morning if late in the evening).
     - Live validation warns user immediately if a selected start time is in the past: *"Bookings must start in the future. Please select a later date or time."*
     - Toggling `is_all_day` automatically bumps `start_date` to tomorrow if today or past was selected (since today's 00:00 IST midnight has passed).
-    - Submit button disabled when past time is selected (`disabled={isSaving || isPastBooking}`).
+    - **Historical Event Editing Lock:** When editing an event that has already started (`initialData.start_time <= Date.now()`), the modal:
+      - Displays an informative warning banner: *"🔒 Historical Event — Scheduling Locked: This event has already started or concluded. Date, time, and all-day settings cannot be modified. You may update notes, venue, client details, fee, deposit, and status."*
+      - Disables `start_date`, `end_date`, `start_time`, `end_time`, and `is_all_day` toggle (`disabled={isStartedEvent}` with `opacity-60 bg-gray-100 cursor-not-allowed`).
+      - In `buildPayload`, strictly preserves `initialData.start_time`, `initialData.end_time`, and `initialData.is_all_day`.
+      - In `handleSubmit`, bypasses the past-date error so the artist can cleanly save metadata updates.
+    - Submit button disabled when past time is selected for new/rescheduled events (`disabled={isSaving || isPastBooking}`).
     - Revalidated at exact moment of submit to account for time elapsed while modal was open.
-  - **Server-Side Validation & Zod Schemas (`lib/calendar/schemas.ts`, `app/actions/calendar.ts`):**
+
+  - **Server-Side Validation (`app/actions/calendar.ts`):**
     - `createManualGigSchema` and `createUnavailableBlockSchema` enforce `start_time > Date.now()`.
     - `createManualGigAction` and `createUnavailableBlockAction` independently reject `start_time <= Date.now()`.
-    - `updateCalendarEventAction` allows historical metadata edits (notes, venue, contacts, fee) on past events if `start_time` is unchanged, but strictly rejects rescheduling an event to a past timestamp.
-  - **Database Protection Assessment (`save_artist_calendar_event` RPC):**
-    - Direct RPC bypass assessment: the currently deployed RPC checked `p_end_time <= p_start_time` but lacked `p_start_time <= clock_timestamp()`.
-    - Prepared minimal follow-up migration: `supabase/migrations/20261112_prevent_past_calendar_events.sql` ready for owner review. Not executed.
-  - **QA Test Suite (`scratch/test_past_bookings.ts` — 14/14 PASS):**
-    - Yesterday at 8 PM IST: rejected.
-    - Today, one hour ago: rejected.
-    - Today, one hour from now: allowed.
-    - Tomorrow: allowed.
-    - All-day yesterday: rejected.
-    - All-day today: rejected.
-    - All-day tomorrow: allowed.
-    - Existing historical event metadata update: allowed.
-    - Rescheduling an event into the past: rejected.
-    - Crossing midnight IST in future: allowed.
-    - `getDefaultFutureIstTimings()` future guarantee: verified.
-- **Build Verification:**
-  - `npx tsc --noEmit`: 0 errors.
-  - `npm run lint`: 0 errors (9 pre-existing `<img>` warnings unchanged).
-  - `npm run build`: Exit code 0, 17/17 pages generated successfully.
+    - `updateCalendarEventAction`:
+      - Queries existing event: `id, start_time, end_time, is_all_day, source`.
+      - If `existingEvent.start_time <= Date.now()` (event has started):
+        - Strictly rejects any change to `start_time`, `end_time`, or `is_all_day` with: *"Scheduling details (start time, end time, and all-day setting) cannot be modified for events that have already started or concluded. You may still update notes, venue, client details, fee, and status."*
+        - Allows updates to `title`, `status`, `city`, `venue_name`, `venue_address`, `client_name`, `client_phone`, `client_email`, `agreed_fee`, `deposit_paid`, `private_notes`.
+      - If `existingEvent.start_time > Date.now()` (future event):
+        - Allows rescheduling only if the new `start_time > Date.now()`.
+        - Rejects rescheduling `start_time` into the past with: *"Rescheduled events must start in the future. Please select a later date or time."*
+
+  - **Database RPC Safety Review (`supabase/migrations/20261112_prevent_past_calendar_events.sql`):**
+    - **Safe search_path:** Uses `SECURITY DEFINER` with `SET search_path = ''`. All system functions (`pg_catalog.clock_timestamp()`, `pg_catalog.now()`, `pg_catalog.pg_advisory_xact_lock()`, `pg_catalog.hashtext()`) and types are schema-qualified. Standard ANSI SQL functions (`trim()`, `char_length()`, `jsonb_build_object()`, `jsonb_agg()`) follow the exact verified pattern from the deployed base migration.
+    - **Auth & Role Guard:** Enforces `auth.uid() IS NOT NULL` and verifies `role = 'artist'` in `public.profiles`.
+    - **Ownership & Platform Protection:** Enforces `WHERE id = p_event_id AND artist_id = v_user_id` and rejects mutations on `source = 'platform_booking'`.
+    - **Started Event Immutability in SQL:**
+      `IF v_existing_event.start_time <= pg_catalog.clock_timestamp() THEN IF p_start_time <> v_existing_event.start_time OR p_end_time <> v_existing_event.end_time OR p_is_all_day <> v_existing_event.is_all_day THEN RETURN error...`
+    - **Creation Past-Date Protection in SQL:**
+      `IF p_start_time <= pg_catalog.clock_timestamp() THEN RETURN error...`
+    - **Concurrency & Overlap Safety:** Preserves `pg_advisory_xact_lock` per artist, atomic `[start, end)` half-open interval overlap detection, and explicit `p_allow_overlap` confirmation requirement.
+    - **Permissions:** Explicit `REVOKE ALL FROM PUBLIC, anon; GRANT EXECUTE TO authenticated; NOTIFY pgrst, 'reload schema';`. No unrelated objects or triggers dropped.
+    - Status: Prepared for owner manual application via Supabase SQL Editor.
+
+  - **Automated QA Verification:**
+    - `scratch/test_past_bookings.ts`: **19/19 PASSED**.
+    - `scratch/test_calendar_qa.ts`: **24/24 PASSED**.
+    - `npx tsc --noEmit`: **0 errors**.
+    - `npm run lint`: **0 errors** (9 acceptable `<img>` warnings).
+    - `npm run build`: **17/17 routes generated successfully in 724ms**.
 
 ### 12.16 Phase Boundaries & Handover
 

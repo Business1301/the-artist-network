@@ -358,7 +358,7 @@ export async function updateCalendarEventAction(
   // 1. Verify existence, ownership, and platform immutability
   const { data: existingEvent, error: fetchError } = await supabase
     .from("artist_calendar_events")
-    .select("id, start_time, source")
+    .select("id, start_time, end_time, is_all_day, source")
     .eq("id", payload.event_id)
     .eq("artist_id", authCheck.userId)
     .single();
@@ -377,21 +377,63 @@ export async function updateCalendarEventAction(
     };
   }
 
-  // 2. Prevent rescheduling to a past timestamp (allow metadata-only edits of past events)
-  const isStartTimeChanged =
-    new Date(existingEvent.start_time).getTime() !==
-    new Date(payload.start_time).getTime();
+  // 2. Prevent past-booking violations and preserve historical event scheduling
+  // - Once an event has started (start_time <= now), do not permit changes to start_time, end_time, or is_all_day.
+  //   Metadata updates (notes, venue, contacts, fee, status, title) remain permitted.
+  // - For future events, rescheduling cannot set start_time into the past.
+  const existingStartTime = new Date(existingEvent.start_time).getTime();
+  const existingEndTime = new Date(existingEvent.end_time).getTime();
+  const now = Date.now();
+  const hasEventStarted = existingStartTime <= now;
 
-  if (isStartTimeChanged && new Date(payload.start_time).getTime() <= Date.now()) {
-    return {
-      success: false,
-      error: "Rescheduled events must start in the future. Please select a later date or time.",
-      validationErrors: {
-        start_time: [
+  if (hasEventStarted) {
+    const isStartTimeChanged =
+      existingStartTime !== new Date(payload.start_time).getTime();
+    const isEndTimeChanged =
+      existingEndTime !== new Date(payload.end_time).getTime();
+    const isAllDayChanged =
+      Boolean(existingEvent.is_all_day) !== Boolean(payload.is_all_day);
+
+    if (isStartTimeChanged || isEndTimeChanged || isAllDayChanged) {
+      const vErrors: Record<string, string[]> = {};
+      if (isStartTimeChanged) {
+        vErrors.start_time = [
+          "Scheduling details cannot be modified for events that have already started or concluded.",
+        ];
+      }
+      if (isEndTimeChanged) {
+        vErrors.end_time = [
+          "Scheduling details cannot be modified for events that have already started or concluded.",
+        ];
+      }
+      if (isAllDayChanged) {
+        vErrors.is_all_day = [
+          "Scheduling details cannot be modified for events that have already started or concluded.",
+        ];
+      }
+      return {
+        success: false,
+        error:
+          "Scheduling details (start time, end time, and all-day setting) cannot be modified for events that have already started or concluded. You may still update notes, venue, client details, fee, and status.",
+        validationErrors: vErrors,
+      };
+    }
+  } else {
+    // For future events, prevent rescheduling start_time into the past
+    const isStartTimeChanged =
+      existingStartTime !== new Date(payload.start_time).getTime();
+    if (isStartTimeChanged && new Date(payload.start_time).getTime() <= now) {
+      return {
+        success: false,
+        error:
           "Rescheduled events must start in the future. Please select a later date or time.",
-        ],
-      },
-    };
+        validationErrors: {
+          start_time: [
+            "Rescheduled events must start in the future. Please select a later date or time.",
+          ],
+        },
+      };
+    }
   }
 
   const { data, error } = await supabase.rpc("save_artist_calendar_event", {
