@@ -2,16 +2,15 @@
 -- THE ARTIST NETWORK — Phase 4.6: Artist Calendar & Availability Management
 -- Migration: 20261112_artist_calendar.sql
 --
--- STATUS: REVISED FOR ERROR-FREE MANUAL EXECUTION IN SUPABASE SQL EDITOR
+-- STATUS: READY FOR MANUAL EXECUTION IN SUPABASE SQL EDITOR
 --
--- Fixes applied:
---   1. Replaced invalid 'FROM public, anon' with separate 'FROM PUBLIC' and 'FROM anon'
---   2. Explicit parameter signatures on all REVOKE and GRANT ON FUNCTION statements
---   3. Pre-emptive DROP of any prior function overloads to prevent 'function not unique'
---   4. Fully qualified all built-ins (pg_catalog.now, pg_catalog.jsonb_*, pg_catalog.trim)
---   5. Explicit ::bigint cast for pg_advisory_xact_lock argument
---   6. Standard TEXT CHECK constraints matching platform conventions
---   7. Explicit REVOKE of direct client write privileges (INSERT, UPDATE, DELETE)
+-- Precision Updates:
+--   1. Removed blanket dynamic DROP FUNCTION loop (no existing overloads in catalog).
+--   2. Standardized string handling to ANSI SQL trim() and char_length().
+--   3. Explicit function signatures on all REVOKE and GRANT statements.
+--   4. Standard separated role revocations: FROM PUBLIC and FROM anon.
+--   5. Explicit ::bigint cast for advisory lock key: pg_advisory_xact_lock(hashtext(...)::bigint).
+--   6. Preserved all security invariants (owner RLS, RPCs, direct write revocation).
 --
 -- PRIVACY INVARIANT:
 --   - ZERO public SELECT policies. Public/anon roles have ZERO grants.
@@ -243,27 +242,7 @@ GRANT SELECT ON TABLE public.artist_calendar_events TO authenticated;
 
 
 -- ============================================================
--- 4. Clean Up Any Prior Function Overloads
--- ============================================================
-
-DO $$
-DECLARE
-  v_proc RECORD;
-BEGIN
-  FOR v_proc IN 
-    SELECT p.oid::regprocedure AS proc_sig
-    FROM pg_proc p 
-    JOIN pg_namespace n ON p.pronamespace = n.oid 
-    WHERE n.nspname = 'public' 
-      AND p.proname IN ('save_artist_calendar_event', 'delete_artist_calendar_event')
-  LOOP
-    EXECUTE 'DROP FUNCTION IF EXISTS ' || v_proc.proc_sig || ' CASCADE;';
-  END LOOP;
-END $$;
-
-
--- ============================================================
--- 5. Atomic Calendar Write & Conflict Detection RPC
+-- 4. Atomic Calendar Write & Conflict Detection RPC
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.save_artist_calendar_event(
@@ -309,28 +288,28 @@ BEGIN
   END IF;
 
   -- 2. Input validation
-  IF p_title IS NULL OR pg_catalog.char_length(pg_catalog.trim(p_title)) = 0 THEN
-    RETURN pg_catalog.jsonb_build_object('success', false, 'error', 'Event title is required');
+  IF p_title IS NULL OR char_length(trim(p_title)) = 0 THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Event title is required');
   END IF;
 
-  IF pg_catalog.char_length(p_title) > 120 THEN
-    RETURN pg_catalog.jsonb_build_object('success', false, 'error', 'Event title cannot exceed 120 characters');
+  IF char_length(p_title) > 120 THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Event title cannot exceed 120 characters');
   END IF;
 
   IF p_start_time IS NULL OR p_end_time IS NULL THEN
-    RETURN pg_catalog.jsonb_build_object('success', false, 'error', 'Start time and end time are required');
+    RETURN jsonb_build_object('success', false, 'error', 'Start time and end time are required');
   END IF;
 
   IF p_end_time <= p_start_time THEN
-    RETURN pg_catalog.jsonb_build_object('success', false, 'error', 'End time must be strictly after start time');
+    RETURN jsonb_build_object('success', false, 'error', 'End time must be strictly after start time');
   END IF;
 
   IF p_event_type NOT IN ('gig_booking', 'unavailable_block') THEN
-    RETURN pg_catalog.jsonb_build_object('success', false, 'error', 'Invalid event_type. Must be gig_booking or unavailable_block');
+    RETURN jsonb_build_object('success', false, 'error', 'Invalid event_type. Must be gig_booking or unavailable_block');
   END IF;
 
   IF p_status NOT IN ('tentative', 'confirmed', 'cancelled', 'completed') THEN
-    RETURN pg_catalog.jsonb_build_object('success', false, 'error', 'Invalid status. Must be tentative, confirmed, cancelled, or completed');
+    RETURN jsonb_build_object('success', false, 'error', 'Invalid status. Must be tentative, confirmed, cancelled, or completed');
   END IF;
 
   -- 3. Acquire Per-Artist Advisory Lock (Serializes writes for this artist within transaction)
@@ -343,18 +322,18 @@ BEGIN
     WHERE id = p_event_id AND artist_id = v_user_id;
 
     IF NOT FOUND THEN
-      RETURN pg_catalog.jsonb_build_object('success', false, 'error', 'Event not found or access denied');
+      RETURN jsonb_build_object('success', false, 'error', 'Event not found or access denied');
     END IF;
 
     IF v_existing_event.source = 'platform_booking' THEN
-      RETURN pg_catalog.jsonb_build_object('success', false, 'error', 'Platform-generated bookings cannot be modified manually');
+      RETURN jsonb_build_object('success', false, 'error', 'Platform-generated bookings cannot be modified manually');
     END IF;
   END IF;
 
   -- 5. Conflict Detection (Only for confirmed events)
   IF p_status = 'confirmed' THEN
-    SELECT pg_catalog.jsonb_agg(
-      pg_catalog.jsonb_build_object(
+    SELECT jsonb_agg(
+      jsonb_build_object(
         'id', e.id,
         'title', e.title,
         'start_time', e.start_time,
@@ -373,7 +352,7 @@ BEGIN
 
     -- If conflicts found and explicit acknowledgment is false, return conflict payload without saving
     IF v_conflicts IS NOT NULL AND NOT p_allow_overlap THEN
-      RETURN pg_catalog.jsonb_build_object(
+      RETURN jsonb_build_object(
         'success', false,
         'conflict', true,
         'conflicts', v_conflicts,
@@ -386,21 +365,21 @@ BEGIN
   IF p_event_id IS NOT NULL THEN
     UPDATE public.artist_calendar_events
     SET
-      title = pg_catalog.trim(p_title),
+      title = trim(p_title),
       event_type = p_event_type,
       status = p_status,
       start_time = p_start_time,
       end_time = p_end_time,
       is_all_day = p_is_all_day,
-      city = pg_catalog.trim(p_city),
-      venue_name = pg_catalog.trim(p_venue_name),
-      venue_address = pg_catalog.trim(p_venue_address),
-      client_name = pg_catalog.trim(p_client_name),
-      client_phone = pg_catalog.trim(p_client_phone),
-      client_email = pg_catalog.trim(p_client_email),
+      city = trim(p_city),
+      venue_name = trim(p_venue_name),
+      venue_address = trim(p_venue_address),
+      client_name = trim(p_client_name),
+      client_phone = trim(p_client_phone),
+      client_email = trim(p_client_email),
       agreed_fee = p_agreed_fee,
       deposit_paid = p_deposit_paid,
-      private_notes = pg_catalog.trim(p_private_notes),
+      private_notes = trim(p_private_notes),
       updated_at = pg_catalog.now()
     WHERE id = p_event_id AND artist_id = v_user_id
     RETURNING id INTO v_saved_id;
@@ -428,24 +407,24 @@ BEGIN
       'external_manual',
       p_event_type,
       p_status,
-      pg_catalog.trim(p_title),
+      trim(p_title),
       p_start_time,
       p_end_time,
       p_is_all_day,
-      pg_catalog.trim(p_city),
-      pg_catalog.trim(p_venue_name),
-      pg_catalog.trim(p_venue_address),
-      pg_catalog.trim(p_client_name),
-      pg_catalog.trim(p_client_phone),
-      pg_catalog.trim(p_client_email),
+      trim(p_city),
+      trim(p_venue_name),
+      trim(p_venue_address),
+      trim(p_client_name),
+      trim(p_client_phone),
+      trim(p_client_email),
       p_agreed_fee,
       p_deposit_paid,
-      pg_catalog.trim(p_private_notes)
+      trim(p_private_notes)
     )
     RETURNING id INTO v_saved_id;
   END IF;
 
-  RETURN pg_catalog.jsonb_build_object(
+  RETURN jsonb_build_object(
     'success', true,
     'conflict', false,
     'event_id', v_saved_id,
@@ -469,7 +448,7 @@ GRANT EXECUTE ON FUNCTION public.save_artist_calendar_event(
 
 
 -- ============================================================
--- 6. Atomic Calendar Delete RPC
+-- 5. Atomic Calendar Delete RPC
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.delete_artist_calendar_event(
@@ -494,17 +473,17 @@ BEGIN
   WHERE id = p_event_id AND artist_id = v_user_id;
 
   IF NOT FOUND THEN
-    RETURN pg_catalog.jsonb_build_object('success', false, 'error', 'Event not found or access denied');
+    RETURN jsonb_build_object('success', false, 'error', 'Event not found or access denied');
   END IF;
 
   IF v_event.source = 'platform_booking' THEN
-    RETURN pg_catalog.jsonb_build_object('success', false, 'error', 'Platform-generated bookings cannot be deleted manually');
+    RETURN jsonb_build_object('success', false, 'error', 'Platform-generated bookings cannot be deleted manually');
   END IF;
 
   DELETE FROM public.artist_calendar_events 
   WHERE id = p_event_id AND artist_id = v_user_id;
 
-  RETURN pg_catalog.jsonb_build_object('success', true, 'message', 'Event deleted successfully');
+  RETURN jsonb_build_object('success', true, 'message', 'Event deleted successfully');
 END;
 $$;
 
