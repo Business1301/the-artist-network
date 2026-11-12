@@ -2,13 +2,14 @@
 -- THE ARTIST NETWORK — Phase 4.6: Artist Calendar & Availability Management
 -- Migration: 20261112_artist_calendar.sql
 --
--- STATUS: STAGE 1 PREPARATION ONLY (DO NOT EXECUTE WITHOUT EXPLICIT APPROVAL)
+-- STATUS: READY FOR MANUAL EXECUTION IN SUPABASE SQL EDITOR
 --
 -- This migration sets up the private calendar and availability system for artists:
---   1. Custom ENUM types (source, event_type, status)
---   2. Table public.artist_calendar_events with strict time & financial constraints
---   3. Anti-tampering triggers protecting source, artist_id, and platform bookings
---   4. Strict Row Level Security (RLS) ensuring 100% private data isolation
+--   1. Table public.artist_calendar_events with strict time & financial constraints
+--      (Uses standard TEXT CHECK constraints matching all existing platform tables)
+--   2. Anti-tampering triggers protecting source, artist_id, and platform bookings
+--   3. Strict Row Level Security (RLS) ensuring 100% private data isolation
+--   4. Direct client write privileges (INSERT, UPDATE, DELETE) explicitly REVOKED
 --   5. Atomic RPC public.save_artist_calendar_event with per-artist locking
 --      and transaction-safe conflict detection
 --   6. Atomic RPC public.delete_artist_calendar_event with platform booking shield
@@ -21,48 +22,20 @@
 BEGIN;
 
 -- ============================================================
--- 1. Custom Types
--- ============================================================
-
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'calendar_event_source') THEN
-    CREATE TYPE public.calendar_event_source AS ENUM (
-      'external_manual',    -- Managed independently by the artist for off-platform gigs
-      'platform_booking'    -- Reserved for future Phase 5 TAN booking inquiries
-    );
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'calendar_event_type') THEN
-    CREATE TYPE public.calendar_event_type AS ENUM (
-      'gig_booking',        -- Performance, concert, set, shoot, or exhibition
-      'unavailable_block'   -- Vacation, rehearsal, travel, illness, personal off-day
-    );
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'calendar_booking_status') THEN
-    CREATE TYPE public.calendar_booking_status AS ENUM (
-      'tentative',          -- In negotiation / tentative hold (non-blocking)
-      'confirmed',          -- Finalized booking (participates in conflict detection)
-      'cancelled',          -- Inactive / cancelled event
-      'completed'           -- Past fulfilled performance
-    );
-  END IF;
-END $$;
-
-
--- ============================================================
--- 2. Table: public.artist_calendar_events
+-- 1. Table: public.artist_calendar_events
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS public.artist_calendar_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   artist_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   
-  -- Event classification
-  source public.calendar_event_source NOT NULL DEFAULT 'external_manual',
-  event_type public.calendar_event_type NOT NULL DEFAULT 'gig_booking',
-  status public.calendar_booking_status NOT NULL DEFAULT 'confirmed',
+  -- Event classification (Uses TEXT CHECK matching platform conventions)
+  source TEXT NOT NULL DEFAULT 'external_manual'
+    CHECK (source IN ('external_manual', 'platform_booking')),
+  event_type TEXT NOT NULL DEFAULT 'gig_booking'
+    CHECK (event_type IN ('gig_booking', 'unavailable_block')),
+  status TEXT NOT NULL DEFAULT 'confirmed'
+    CHECK (status IN ('tentative', 'confirmed', 'cancelled', 'completed')),
   
   -- Title & Scheduling (stored as UTC timestamptz, interpreted in Asia/Kolkata)
   title TEXT NOT NULL CHECK (char_length(trim(title)) > 0 AND char_length(title) <= 120),
@@ -103,7 +76,7 @@ CREATE INDEX IF NOT EXISTS idx_artist_calendar_events_conflict
 
 
 -- ============================================================
--- 3. Anti-Tampering Triggers
+-- 2. Anti-Tampering Triggers
 -- ============================================================
 
 -- Function: Trigger for INSERT protection
@@ -217,7 +190,7 @@ CREATE TRIGGER trg_calendar_event_delete_protection
 
 
 -- ============================================================
--- 4. Row Level Security (RLS) Policies
+-- 3. Row Level Security (RLS) Policies
 -- ============================================================
 
 ALTER TABLE public.artist_calendar_events ENABLE ROW LEVEL SECURITY;
@@ -272,7 +245,7 @@ GRANT SELECT ON public.artist_calendar_events TO authenticated;
 
 
 -- ============================================================
--- 5. Atomic Calendar Write & Conflict Detection RPC
+-- 4. Atomic Calendar Write & Conflict Detection RPC
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.save_artist_calendar_event(
@@ -305,8 +278,6 @@ DECLARE
   v_existing_event RECORD;
   v_conflicts JSONB;
   v_saved_id UUID;
-  v_event_type public.calendar_event_type;
-  v_status public.calendar_booking_status;
 BEGIN
   -- 1. Authorization & Role Verification
   v_user_id := auth.uid();
@@ -336,13 +307,13 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'End time must be strictly after start time');
   END IF;
 
-  -- Safe enum cast validation
-  BEGIN
-    v_event_type := p_event_type::public.calendar_event_type;
-    v_status := p_status::public.calendar_booking_status;
-  EXCEPTION WHEN OTHERS THEN
-    RETURN jsonb_build_object('success', false, 'error', 'Invalid event type or status value');
-  END;
+  IF p_event_type NOT IN ('gig_booking', 'unavailable_block') THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Invalid event_type. Must be gig_booking or unavailable_block');
+  END IF;
+
+  IF p_status NOT IN ('tentative', 'confirmed', 'cancelled', 'completed') THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Invalid status. Must be tentative, confirmed, cancelled, or completed');
+  END IF;
 
   -- 3. Acquire Per-Artist Advisory Lock (Serializes writes for this artist within transaction)
   PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(v_user_id::text));
@@ -363,7 +334,7 @@ BEGIN
   END IF;
 
   -- 5. Conflict Detection (Only for confirmed events)
-  IF v_status = 'confirmed' THEN
+  IF p_status = 'confirmed' THEN
     SELECT jsonb_agg(
       jsonb_build_object(
         'id', e.id,
@@ -398,8 +369,8 @@ BEGIN
     UPDATE public.artist_calendar_events
     SET
       title = trim(p_title),
-      event_type = v_event_type,
-      status = v_status,
+      event_type = p_event_type,
+      status = p_status,
       start_time = p_start_time,
       end_time = p_end_time,
       is_all_day = p_is_all_day,
@@ -437,8 +408,8 @@ BEGIN
     ) VALUES (
       v_user_id,
       'external_manual',
-      v_event_type,
-      v_status,
+      p_event_type,
+      p_status,
       trim(p_title),
       p_start_time,
       p_end_time,
@@ -471,7 +442,7 @@ GRANT EXECUTE ON FUNCTION public.save_artist_calendar_event TO authenticated;
 
 
 -- ============================================================
--- 6. Atomic Calendar Delete RPC
+-- 5. Atomic Calendar Delete RPC
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.delete_artist_calendar_event(
@@ -516,3 +487,5 @@ GRANT EXECUTE ON FUNCTION public.delete_artist_calendar_event TO authenticated;
 
 COMMIT;
 
+-- Notify PostgREST immediately after commit to reload the schema cache
+NOTIFY pgrst, 'reload schema';
