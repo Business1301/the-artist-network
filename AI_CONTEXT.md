@@ -804,18 +804,16 @@ All integration checks executed with 100% pass rate:
 ### 12.11 Phase 4.6 Stage 1: Calendar Database Migration & Status
 
 - **Status (2026-11-12):** Initial migration execution rolled back in Supabase SQL Editor (`table_count = 0, rpc_count = 0`).
-- **Root Cause Analysis:**
-  1. **Privilege Revoke Syntax:** Statements using `REVOKE ... FROM public, anon` mixed PostgreSQL reserved keyword `PUBLIC` with role names, causing role lookup / syntax failure in multi-statement buffer.
-  2. **Unqualified Function Signatures in GRANT/REVOKE:** `REVOKE/GRANT ... ON FUNCTION func_name` without explicit argument types failed when resolving overloaded or existing function signatures (`function not unique`).
-  3. **Advisory Lock Type Match:** `pg_advisory_xact_lock(hashtext(v_user_id::text))` passed `int4` without explicit `::bigint` cast under empty search path.
-  4. **Strict Empty Search Path Resolution:** Built-in JSON and string functions required explicit qualification (`pg_catalog.jsonb_build_object`, `pg_catalog.jsonb_agg`, `pg_catalog.trim`, `pg_catalog.char_length`).
-- **Corrections Applied in `supabase/migrations/20261112_artist_calendar.sql`:**
-  - Added dynamic PL/pgSQL block to pre-emptively drop any prior legacy overloads of `save_artist_calendar_event` and `delete_artist_calendar_event`.
-  - Replaced `FROM public, anon` with standard separated statements: `FROM PUBLIC` and `FROM anon`.
+- **Defect Analysis (Distinguishing Confirmed from Hypothetical):**
+  1. **Confirmed Defect — Privilege Revoke Role Syntax:** Statements using `REVOKE ... FROM public, anon` treated `public` as a role name rather than SQL keyword `PUBLIC`. In PostgreSQL, `public` is not a role in `pg_roles`, producing `ERROR: role "public" does not exist` and aborting multi-statement transactions.
+  2. **Confirmed Defect — Schema-Qualified `pg_catalog.trim`:** Attempting `pg_catalog.trim(...)` fails in PostgreSQL because the catalog function is named `btrim`, while `TRIM(...)` is ANSI SQL keyword syntax handled directly by the SQL grammar parser.
+  3. **Hypothetical / Unverified:** Exact line of failure during the initial manual run cannot be conclusively proven without the original PostgreSQL SQL Editor error log. Factors such as partial editor selection, buffer parsing order, or `hashtext` cast ambiguity remain potential contributing factors.
+- **Refined Precision Updates in `supabase/migrations/20261112_artist_calendar.sql`:**
+  - Removed blanket dynamic `DROP FUNCTION ... CASCADE` loop (safe against confirmed database state where `rpc_count = 0`).
+  - Standardized all string handling to core ANSI SQL `trim(...)` and `char_length(...)` matching existing platform migrations (`20261101_admin_system.sql`, `20261112_self_publish.sql`).
+  - Separated role revocations cleanly: `REVOKE ... FROM PUBLIC;` and `REVOKE ... FROM anon;`.
   - Added full argument signatures to all `REVOKE` and `GRANT EXECUTE ON FUNCTION` statements.
-  - Added explicit `::bigint` cast: `PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(v_user_id::text)::bigint);`.
-  - Schema-qualified all PL/pgSQL built-in function calls with `pg_catalog.`.
-  - Fixed trigger assignment operator (`NEW.updated_at := pg_catalog.now();`).
+  - Added explicit `::bigint` cast for advisory lock: `PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(v_user_id::text)::bigint);`.
   - Retained strict table write revokes, owner-only RLS, and platform booking shields.
 - **Verification:**
   - `npx tsc --noEmit`: 0 errors.
