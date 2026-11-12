@@ -261,12 +261,13 @@ CREATE POLICY "Artists can delete their own manual calendar events"
   USING (auth.uid() = artist_id AND source = 'external_manual');
 
 -- Permissions: Revoke all from anon/public; grant SELECT to authenticated only.
--- Direct client INSERT, UPDATE, and DELETE table privileges are strictly REVOKED.
+-- Direct client INSERT, UPDATE, and DELETE table privileges are explicitly REVOKED.
 -- All mutations are guaranteed to execute via the atomic RPCs:
 --   public.save_artist_calendar_event
 --   public.delete_artist_calendar_event
 -- This prevents any client from bypassing the per-artist lock or conflict detection rules.
 REVOKE ALL ON public.artist_calendar_events FROM public, anon;
+REVOKE INSERT, UPDATE, DELETE ON public.artist_calendar_events FROM authenticated;
 GRANT SELECT ON public.artist_calendar_events TO authenticated;
 
 
