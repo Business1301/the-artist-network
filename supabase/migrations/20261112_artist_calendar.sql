@@ -181,7 +181,7 @@ BEGIN
     RAISE EXCEPTION 'Access Denied: Platform-generated bookings cannot be modified manually' USING ERRCODE = '42501';
   END IF;
 
-  NEW.updated_at = now();
+  NEW.updated_at = pg_catalog.now();
   RETURN NEW;
 END;
 $$;
@@ -260,9 +260,14 @@ CREATE POLICY "Artists can delete their own manual calendar events"
   TO authenticated
   USING (auth.uid() = artist_id AND source = 'external_manual');
 
--- Permissions: Revoke all from anon/public; grant to authenticated only
+-- Permissions: Revoke all from anon/public; grant SELECT to authenticated only.
+-- Direct client INSERT, UPDATE, and DELETE table privileges are strictly REVOKED.
+-- All mutations are guaranteed to execute via the atomic RPCs:
+--   public.save_artist_calendar_event
+--   public.delete_artist_calendar_event
+-- This prevents any client from bypassing the per-artist lock or conflict detection rules.
 REVOKE ALL ON public.artist_calendar_events FROM public, anon;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.artist_calendar_events TO authenticated;
+GRANT SELECT ON public.artist_calendar_events TO authenticated;
 
 
 -- ============================================================
@@ -509,3 +514,4 @@ REVOKE ALL ON FUNCTION public.delete_artist_calendar_event FROM public, anon;
 GRANT EXECUTE ON FUNCTION public.delete_artist_calendar_event TO authenticated;
 
 COMMIT;
+

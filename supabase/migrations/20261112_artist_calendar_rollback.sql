@@ -91,3 +91,4 @@ BEGIN
     DROP TYPE IF EXISTS public.calendar_event_source;
   END IF;
 END $$;
+
