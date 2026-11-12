@@ -815,11 +815,31 @@ All integration checks executed with 100% pass rate:
   8. Atomic Event Deletion: `delete_artist_calendar_event` validated and verified.
   9. Public Availability API: Confirmed non-existent (HTTP 404 / PGRST202).
   10. Existing Platform Data: Profiles, artist profiles, portfolio items, and authentication verified 100% operational.
-- **Stage 1 Verification Status:** COMPLETE & VERIFIED. Ready for Stage 2 (Server Actions & Frontend Calendar View).
+- **Stage 1 Verification Status:** COMPLETE & VERIFIED.
 
-### 12.12 Next Steps & Phase Boundaries
+### 12.12 Phase 4.6 Stage 2: Calendar Server Actions & Data Layer (PASSED)
 
-- **Phase 4.6 Execution:** Awaiting owner approval before running the migration in Supabase Dashboard SQL Editor.
+- **Status (2026-11-12):** Stage 2 implemented and verified with zero TypeScript, ESLint, or Next.js build errors.
+- **Files Created / Modified:**
+  - `lib/calendar/types.ts`: Strongly typed domain models (`ArtistCalendarEvent`, `ConflictingEvent`, `CalendarActionResult<T>`).
+  - `lib/calendar/utils.ts`: Asia/Kolkata (`IST`, UTC+05:30) date & time utilities (`istToUtcIso`, `formatIstDate`, `formatIstTime`, `getMonthDateRange`, `getWeekDateRange`).
+  - `lib/calendar/schemas.ts`: Zod validation schemas (`createManualGigSchema`, `createUnavailableBlockSchema`, `updateCalendarEventSchema`, `calendarDateRangeSchema`, `checkCalendarConflictSchema`).
+  - `app/actions/calendar.ts`: Server Actions strictly verified via `auth.getUser()` + `public.profiles.role = 'artist'`:
+    - `getArtistCalendarEventsAction`: Retrieves owner's events for date range using standard half-open interval overlap (`start_time < rangeEnd AND end_time > rangeStart`). Correctly handles multi-day and overnight bookings.
+    - `createManualGigAction`: Creates external gig bookings exclusively via `save_artist_calendar_event` RPC.
+    - `createUnavailableBlockAction`: Creates blocked time periods via `save_artist_calendar_event` RPC.
+    - `updateCalendarEventAction`: Updates existing manual events with conflict detection via RPC.
+    - `deleteCalendarEventAction`: Safely deletes manual events via `delete_artist_calendar_event` RPC while protecting platform-generated bookings.
+    - `checkCalendarConflictAction`: Standalone read-only conflict check returning structured overlapping events.
+- **Verification Results:**
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run lint`: 0 errors (only pre-existing `<img>` warnings).
+  - `npm run build`: 16/16 routes compiled successfully.
+  - Integration Test Suite: 10/10 checks passed against live Supabase backend. All test events cleaned up (final row count = 0).
+
+### 12.13 Next Steps & Phase Boundaries
+
+- **Phase 4.6 Stage 3 (Pending):** Dedicated Artist Calendar UI (`/dashboard/artist/calendar`), month/week views, booking creation modal, and conflict resolution dialog.
 - **Phase 5:** NOT STARTED (Strict rule: Phase 5 remains blocked until explicit user sign-off).
 
 
