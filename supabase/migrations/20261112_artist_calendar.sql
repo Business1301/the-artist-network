@@ -2,17 +2,16 @@
 -- THE ARTIST NETWORK — Phase 4.6: Artist Calendar & Availability Management
 -- Migration: 20261112_artist_calendar.sql
 --
--- STATUS: READY FOR MANUAL EXECUTION IN SUPABASE SQL EDITOR
+-- STATUS: REVISED FOR ERROR-FREE MANUAL EXECUTION IN SUPABASE SQL EDITOR
 --
--- This migration sets up the private calendar and availability system for artists:
---   1. Table public.artist_calendar_events with strict time & financial constraints
---      (Uses standard TEXT CHECK constraints matching all existing platform tables)
---   2. Anti-tampering triggers protecting source, artist_id, and platform bookings
---   3. Strict Row Level Security (RLS) ensuring 100% private data isolation
---   4. Direct client write privileges (INSERT, UPDATE, DELETE) explicitly REVOKED
---   5. Atomic RPC public.save_artist_calendar_event with per-artist locking
---      and transaction-safe conflict detection
---   6. Atomic RPC public.delete_artist_calendar_event with platform booking shield
+-- Fixes applied:
+--   1. Replaced invalid 'FROM public, anon' with separate 'FROM PUBLIC' and 'FROM anon'
+--   2. Explicit parameter signatures on all REVOKE and GRANT ON FUNCTION statements
+--   3. Pre-emptive DROP of any prior function overloads to prevent 'function not unique'
+--   4. Fully qualified all built-ins (pg_catalog.now, pg_catalog.jsonb_*, pg_catalog.trim)
+--   5. Explicit ::bigint cast for pg_advisory_xact_lock argument
+--   6. Standard TEXT CHECK constraints matching platform conventions
+--   7. Explicit REVOKE of direct client write privileges (INSERT, UPDATE, DELETE)
 --
 -- PRIVACY INVARIANT:
 --   - ZERO public SELECT policies. Public/anon roles have ZERO grants.
@@ -154,7 +153,7 @@ BEGIN
     RAISE EXCEPTION 'Access Denied: Platform-generated bookings cannot be modified manually' USING ERRCODE = '42501';
   END IF;
 
-  NEW.updated_at = pg_catalog.now();
+  NEW.updated_at := pg_catalog.now();
   RETURN NEW;
 END;
 $$;
@@ -233,19 +232,38 @@ CREATE POLICY "Artists can delete their own manual calendar events"
   TO authenticated
   USING (auth.uid() = artist_id AND source = 'external_manual');
 
--- Permissions: Revoke all from anon/public; grant SELECT to authenticated only.
+-- Permissions:
 -- Direct client INSERT, UPDATE, and DELETE table privileges are explicitly REVOKED.
--- All mutations are guaranteed to execute via the atomic RPCs:
---   public.save_artist_calendar_event
---   public.delete_artist_calendar_event
--- This prevents any client from bypassing the per-artist lock or conflict detection rules.
-REVOKE ALL ON public.artist_calendar_events FROM public, anon;
-REVOKE INSERT, UPDATE, DELETE ON public.artist_calendar_events FROM authenticated;
-GRANT SELECT ON public.artist_calendar_events TO authenticated;
+-- Authenticated users retain SELECT only, subject to owner-only RLS.
+-- All mutations must execute through the secured RPCs.
+REVOKE ALL ON TABLE public.artist_calendar_events FROM PUBLIC;
+REVOKE ALL ON TABLE public.artist_calendar_events FROM anon;
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.artist_calendar_events FROM authenticated;
+GRANT SELECT ON TABLE public.artist_calendar_events TO authenticated;
 
 
 -- ============================================================
--- 4. Atomic Calendar Write & Conflict Detection RPC
+-- 4. Clean Up Any Prior Function Overloads
+-- ============================================================
+
+DO $$
+DECLARE
+  v_proc RECORD;
+BEGIN
+  FOR v_proc IN 
+    SELECT p.oid::regprocedure AS proc_sig
+    FROM pg_proc p 
+    JOIN pg_namespace n ON p.pronamespace = n.oid 
+    WHERE n.nspname = 'public' 
+      AND p.proname IN ('save_artist_calendar_event', 'delete_artist_calendar_event')
+  LOOP
+    EXECUTE 'DROP FUNCTION IF EXISTS ' || v_proc.proc_sig || ' CASCADE;';
+  END LOOP;
+END $$;
+
+
+-- ============================================================
+-- 5. Atomic Calendar Write & Conflict Detection RPC
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.save_artist_calendar_event(
@@ -291,32 +309,32 @@ BEGIN
   END IF;
 
   -- 2. Input validation
-  IF p_title IS NULL OR char_length(trim(p_title)) = 0 THEN
-    RETURN jsonb_build_object('success', false, 'error', 'Event title is required');
+  IF p_title IS NULL OR pg_catalog.char_length(pg_catalog.trim(p_title)) = 0 THEN
+    RETURN pg_catalog.jsonb_build_object('success', false, 'error', 'Event title is required');
   END IF;
 
-  IF char_length(p_title) > 120 THEN
-    RETURN jsonb_build_object('success', false, 'error', 'Event title cannot exceed 120 characters');
+  IF pg_catalog.char_length(p_title) > 120 THEN
+    RETURN pg_catalog.jsonb_build_object('success', false, 'error', 'Event title cannot exceed 120 characters');
   END IF;
 
   IF p_start_time IS NULL OR p_end_time IS NULL THEN
-    RETURN jsonb_build_object('success', false, 'error', 'Start time and end time are required');
+    RETURN pg_catalog.jsonb_build_object('success', false, 'error', 'Start time and end time are required');
   END IF;
 
   IF p_end_time <= p_start_time THEN
-    RETURN jsonb_build_object('success', false, 'error', 'End time must be strictly after start time');
+    RETURN pg_catalog.jsonb_build_object('success', false, 'error', 'End time must be strictly after start time');
   END IF;
 
   IF p_event_type NOT IN ('gig_booking', 'unavailable_block') THEN
-    RETURN jsonb_build_object('success', false, 'error', 'Invalid event_type. Must be gig_booking or unavailable_block');
+    RETURN pg_catalog.jsonb_build_object('success', false, 'error', 'Invalid event_type. Must be gig_booking or unavailable_block');
   END IF;
 
   IF p_status NOT IN ('tentative', 'confirmed', 'cancelled', 'completed') THEN
-    RETURN jsonb_build_object('success', false, 'error', 'Invalid status. Must be tentative, confirmed, cancelled, or completed');
+    RETURN pg_catalog.jsonb_build_object('success', false, 'error', 'Invalid status. Must be tentative, confirmed, cancelled, or completed');
   END IF;
 
   -- 3. Acquire Per-Artist Advisory Lock (Serializes writes for this artist within transaction)
-  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(v_user_id::text));
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(v_user_id::text)::bigint);
 
   -- 4. If updating, verify ownership and source
   IF p_event_id IS NOT NULL THEN
@@ -325,18 +343,18 @@ BEGIN
     WHERE id = p_event_id AND artist_id = v_user_id;
 
     IF NOT FOUND THEN
-      RETURN jsonb_build_object('success', false, 'error', 'Event not found or access denied');
+      RETURN pg_catalog.jsonb_build_object('success', false, 'error', 'Event not found or access denied');
     END IF;
 
     IF v_existing_event.source = 'platform_booking' THEN
-      RETURN jsonb_build_object('success', false, 'error', 'Platform-generated bookings cannot be modified manually');
+      RETURN pg_catalog.jsonb_build_object('success', false, 'error', 'Platform-generated bookings cannot be modified manually');
     END IF;
   END IF;
 
   -- 5. Conflict Detection (Only for confirmed events)
   IF p_status = 'confirmed' THEN
-    SELECT jsonb_agg(
-      jsonb_build_object(
+    SELECT pg_catalog.jsonb_agg(
+      pg_catalog.jsonb_build_object(
         'id', e.id,
         'title', e.title,
         'start_time', e.start_time,
@@ -354,8 +372,8 @@ BEGIN
       AND e.end_time > p_start_time;
 
     -- If conflicts found and explicit acknowledgment is false, return conflict payload without saving
-    IF v_conflicts IS NOT NULL AND jsonb_array_length(v_conflicts) > 0 AND NOT p_allow_overlap THEN
-      RETURN jsonb_build_object(
+    IF v_conflicts IS NOT NULL AND NOT p_allow_overlap THEN
+      RETURN pg_catalog.jsonb_build_object(
         'success', false,
         'conflict', true,
         'conflicts', v_conflicts,
@@ -368,21 +386,21 @@ BEGIN
   IF p_event_id IS NOT NULL THEN
     UPDATE public.artist_calendar_events
     SET
-      title = trim(p_title),
+      title = pg_catalog.trim(p_title),
       event_type = p_event_type,
       status = p_status,
       start_time = p_start_time,
       end_time = p_end_time,
       is_all_day = p_is_all_day,
-      city = trim(p_city),
-      venue_name = trim(p_venue_name),
-      venue_address = trim(p_venue_address),
-      client_name = trim(p_client_name),
-      client_phone = trim(p_client_phone),
-      client_email = trim(p_client_email),
+      city = pg_catalog.trim(p_city),
+      venue_name = pg_catalog.trim(p_venue_name),
+      venue_address = pg_catalog.trim(p_venue_address),
+      client_name = pg_catalog.trim(p_client_name),
+      client_phone = pg_catalog.trim(p_client_phone),
+      client_email = pg_catalog.trim(p_client_email),
       agreed_fee = p_agreed_fee,
       deposit_paid = p_deposit_paid,
-      private_notes = trim(p_private_notes),
+      private_notes = pg_catalog.trim(p_private_notes),
       updated_at = pg_catalog.now()
     WHERE id = p_event_id AND artist_id = v_user_id
     RETURNING id INTO v_saved_id;
@@ -410,24 +428,24 @@ BEGIN
       'external_manual',
       p_event_type,
       p_status,
-      trim(p_title),
+      pg_catalog.trim(p_title),
       p_start_time,
       p_end_time,
       p_is_all_day,
-      trim(p_city),
-      trim(p_venue_name),
-      trim(p_venue_address),
-      trim(p_client_name),
-      trim(p_client_phone),
-      trim(p_client_email),
+      pg_catalog.trim(p_city),
+      pg_catalog.trim(p_venue_name),
+      pg_catalog.trim(p_venue_address),
+      pg_catalog.trim(p_client_name),
+      pg_catalog.trim(p_client_phone),
+      pg_catalog.trim(p_client_email),
       p_agreed_fee,
       p_deposit_paid,
-      trim(p_private_notes)
+      pg_catalog.trim(p_private_notes)
     )
     RETURNING id INTO v_saved_id;
   END IF;
 
-  RETURN jsonb_build_object(
+  RETURN pg_catalog.jsonb_build_object(
     'success', true,
     'conflict', false,
     'event_id', v_saved_id,
@@ -436,13 +454,22 @@ BEGIN
 END;
 $$;
 
--- Permissions on save RPC
-REVOKE ALL ON FUNCTION public.save_artist_calendar_event FROM public, anon;
-GRANT EXECUTE ON FUNCTION public.save_artist_calendar_event TO authenticated;
+-- Permissions on save RPC (Explicit signatures and isolated role grants)
+REVOKE ALL ON FUNCTION public.save_artist_calendar_event(
+  UUID, TEXT, TEXT, TEXT, TIMESTAMPTZ, TIMESTAMPTZ, BOOLEAN, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, TEXT, BOOLEAN
+) FROM PUBLIC;
+
+REVOKE ALL ON FUNCTION public.save_artist_calendar_event(
+  UUID, TEXT, TEXT, TEXT, TIMESTAMPTZ, TIMESTAMPTZ, BOOLEAN, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, TEXT, BOOLEAN
+) FROM anon;
+
+GRANT EXECUTE ON FUNCTION public.save_artist_calendar_event(
+  UUID, TEXT, TEXT, TEXT, TIMESTAMPTZ, TIMESTAMPTZ, BOOLEAN, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, TEXT, BOOLEAN
+) TO authenticated;
 
 
 -- ============================================================
--- 5. Atomic Calendar Delete RPC
+-- 6. Atomic Calendar Delete RPC
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.delete_artist_calendar_event(
@@ -467,23 +494,24 @@ BEGIN
   WHERE id = p_event_id AND artist_id = v_user_id;
 
   IF NOT FOUND THEN
-    RETURN jsonb_build_object('success', false, 'error', 'Event not found or access denied');
+    RETURN pg_catalog.jsonb_build_object('success', false, 'error', 'Event not found or access denied');
   END IF;
 
   IF v_event.source = 'platform_booking' THEN
-    RETURN jsonb_build_object('success', false, 'error', 'Platform-generated bookings cannot be deleted manually');
+    RETURN pg_catalog.jsonb_build_object('success', false, 'error', 'Platform-generated bookings cannot be deleted manually');
   END IF;
 
   DELETE FROM public.artist_calendar_events 
   WHERE id = p_event_id AND artist_id = v_user_id;
 
-  RETURN jsonb_build_object('success', true, 'message', 'Event deleted successfully');
+  RETURN pg_catalog.jsonb_build_object('success', true, 'message', 'Event deleted successfully');
 END;
 $$;
 
--- Permissions on delete RPC
-REVOKE ALL ON FUNCTION public.delete_artist_calendar_event FROM public, anon;
-GRANT EXECUTE ON FUNCTION public.delete_artist_calendar_event TO authenticated;
+-- Permissions on delete RPC (Explicit signatures and isolated role grants)
+REVOKE ALL ON FUNCTION public.delete_artist_calendar_event(UUID) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.delete_artist_calendar_event(UUID) FROM anon;
+GRANT EXECUTE ON FUNCTION public.delete_artist_calendar_event(UUID) TO authenticated;
 
 COMMIT;
 
