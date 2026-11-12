@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { ArtistCalendarEvent } from "@/lib/calendar/types";
 import {
   formatIstDate,
@@ -23,6 +24,17 @@ export default function EventDetailsModal({
   onEdit,
   onDelete,
 }: EventDetailsModalProps) {
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen || !event) return null;
 
   const style = getEventStyle(event);

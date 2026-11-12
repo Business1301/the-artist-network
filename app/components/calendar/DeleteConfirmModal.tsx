@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { ArtistCalendarEvent } from "@/lib/calendar/types";
 
 interface DeleteConfirmModalProps {
@@ -17,6 +18,17 @@ export default function DeleteConfirmModal({
   onClose,
   onConfirm,
 }: DeleteConfirmModalProps) {
+  useEffect(() => {
+    if (!isOpen || isDeleting) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isDeleting, onClose]);
+
   if (!isOpen || !event) return null;
 
   return (

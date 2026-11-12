@@ -224,17 +224,16 @@ export default function MonthView({
           ) : (
             <div className="space-y-2">
               {selectedEvents.map((ev) => (
-                <button
+                <div
                   key={ev.id}
-                  type="button"
                   onClick={() => onEventClick(ev)}
-                  className="w-full text-left"
+                  className="w-full text-left cursor-pointer"
                 >
                   <EventBadge event={ev} onClick={() => onEventClick(ev)} />
                   <p className="text-[10px] text-gray-500 pl-5 mt-0.5">
                     {formatIstTimeRange(ev.start_time, ev.end_time, ev.is_all_day)}
                   </p>
-                </button>
+                </div>
               ))}
             </div>
           )}

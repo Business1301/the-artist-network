@@ -157,6 +157,18 @@ export default function EventFormModal({
     }
   }, [isOpen, mode, eventType, initialData, defaultDate]);
 
+  // Escape key listener (when not saving or displaying a conflict)
+  useEffect(() => {
+    if (!isOpen || isSaving || conflictPending !== null) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isSaving, conflictPending, onClose]);
+
   const setField = useCallback(
     <K extends keyof FormState>(key: K, value: FormState[K]) => {
       setForm((prev) => ({ ...prev, [key]: value }));
@@ -228,6 +240,7 @@ export default function EventFormModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (isSaving) return;
     setGlobalError(null);
     setFieldErrors({});
     setIsSaving(true);
@@ -265,7 +278,7 @@ export default function EventFormModal({
   }
 
   async function handleSaveAnyway() {
-    if (!conflictPending) return;
+    if (!conflictPending || isConflictSaving) return;
     setIsConflictSaving(true);
     const payload = buildPayload(true);
     let result;

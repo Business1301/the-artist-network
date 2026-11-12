@@ -899,9 +899,43 @@ All integration checks executed with 100% pass rate:
 - No direct table writes from client.
 - Private financials and client contact rendered only in `EventDetailsModal` (private artist view, never public).
 
-### 12.14 Next Steps & Phase Boundaries
+### 12.14 Phase 4.6 Stage 4: Final Calendar QA & Stabilization (COMPLETED)
 
-- **Phase 4.6 Stage 3:** ✅ COMPLETED
-- **Phase 5:** NOT STARTED (Strict rule: Phase 5 remains blocked until explicit user sign-off).
+- **Owner Verification (2026-11-12):** Project owner executed complete manual browser testing with 10/10 tests PASSED:
+  1. Calendar opens and displays current month in Asia/Kolkata (`IST`).
+  2. Switching Month and Week views works cleanly.
+  3. Previous / Next / Today navigation functions accurately across month boundaries.
+  4. Creating external manual gig bookings works.
+  5. Blocking unavailable dates and times works.
+  6. Overlapping bookings properly trigger conflict detection modal.
+  7. "Save Anyway" creates overlap only after explicit artist confirmation.
+  8. Editing existing calendar events updates records correctly.
+  9. Deleting events operates safely after confirmation dialog.
+  10. Mobile calendar layout (375px) with date-dot indicators and agenda panel is usable.
+
+- **Stabilization & Fixes Applied:**
+  - **DOM / Hydration Bug Fix (`MonthView.tsx`):** Eliminated nested `<button>` element on line 227 where mobile agenda wrapped `<EventBadge>` (itself a button) in an outer `<button>`. Replaced with accessible `<div className="cursor-pointer">` container.
+  - **Keyboard Accessibility:** Added `Escape` key listeners to all 4 calendar modals (`EventDetailsModal`, `EventFormModal`, `ConflictModal`, `DeleteConfirmModal`).
+  - **Duplicate Submission Guard:** Added `if (isSaving) return;` / `if (isDeleting) return;` fast guards on `handleSubmit`, `handleSaveAnyway`, and `handleDelete` preventing double-click submission races.
+  - **Edge-Case QA Suite (24/24 PASS):**
+    - IST midnight boundaries (00:00 IST maps to 18:30 UTC previous day, round-trips cleanly).
+    - Overnight gigs crossing midnight (renders on both affected days).
+    - Multi-day blocks and exclusive end boundaries.
+    - Back-to-back non-conflicting gigs (touching boundaries do not trigger false conflicts).
+    - Month/year transitions (rollover from Dec 2026 to Jan 2027).
+    - Month grid cell calculation (guaranteed 35 or 42 cells, starting on Monday).
+    - Zod schema validation (end < start, deposit > fee, bad email, title > 120 chars all rejected).
+
+- **Build Verification:**
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run lint`: 0 errors (9 pre-existing `<img>` warnings unchanged).
+  - `npm run build`: Exit code 0, 17/17 pages generated successfully.
+
+### 12.15 Phase Boundaries & Handover
+
+- **Phase 4.6 (Artist Calendar & Availability):** ✅ FULLY COMPLETED (Stages 1, 2, 3, and 4 all verified and committed).
+- **Phase 5 (Public Enquiries & Booking Workflow):** ⛔ STRICTLY BLOCKED — DO NOT START until explicit user sign-off.
+
+
 
 

@@ -207,7 +207,7 @@ export default function ArtistCalendarPage() {
   }
 
   async function handleDelete() {
-    if (!deleteTarget) return;
+    if (!deleteTarget || isDeleting) return;
     setIsDeleting(true);
     const result = await deleteCalendarEventAction(deleteTarget.id);
     setIsDeleting(false);

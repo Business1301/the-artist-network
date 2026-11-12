@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { ConflictingEvent } from "@/lib/calendar/types";
 import { formatIstDate, formatIstTime } from "@/lib/calendar/utils";
 
@@ -20,6 +21,17 @@ export default function ConflictModal({
   onClose,
   onSaveAnyway,
 }: ConflictModalProps) {
+  useEffect(() => {
+    if (!isOpen || isSaving) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isSaving, onClose]);
+
   if (!isOpen) return null;
 
   return (
