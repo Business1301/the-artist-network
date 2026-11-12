@@ -801,9 +801,36 @@ All integration checks executed with 100% pass rate:
   - `npm run lint`: 0 errors (only pre-existing `<img>` warnings).
   - `npm run build`: 16/16 routes compiled successfully.
 
-### 12.11 Next Steps & Phase Boundaries
+### 12.11 Phase 4.6 Stage 1 Preparation: Calendar Database Migration & RPCs (Prepared, Pending Approval)
 
-- **Phase 4.5 Stage 3 Final Sign-off:** Self-publishing verification complete. Test artist `Demo Test Artist` is published and available for owner suspension/reinstatement smoke test in `/admin/applications`.
+- **Scope:** Prepared the complete, transaction-safe database foundation for the artist calendar & availability system without executing live SQL.
+- **Deliverables Prepared:**
+  1. **Migration File (`supabase/migrations/20261112_artist_calendar.sql`):**
+     - Custom Enums: `calendar_event_source` (`external_manual`, `platform_booking`), `calendar_event_type` (`gig_booking`, `unavailable_block`), `calendar_booking_status` (`tentative`, `confirmed`, `cancelled`, `completed`).
+     - Table `public.artist_calendar_events`: Timezone-aware (`TIMESTAMPTZ`), strict timing check (`end_time > start_time`), private financial & client columns.
+     - Anti-Tampering Triggers:
+       - `trg_calendar_event_insert_protection`: Verifies caller has `artist` role in `profiles`, ensures `auth.uid() = artist_id`, and blocks client creation of `platform_booking` or forged `platform_inquiry_id`.
+       - `trg_calendar_event_update_protection`: Prevents modifying `artist_id`, `source`, or `platform_inquiry_id`; prevents direct edits to platform-generated bookings.
+       - `trg_calendar_event_delete_protection`: Prevents direct client deletion of platform-generated bookings.
+     - Row Level Security (RLS): Strictly owner-only (`auth.uid() = artist_id`). Zero public/anon grants.
+     - Atomic Write RPC (`save_artist_calendar_event`): Acquires per-artist advisory lock (`pg_advisory_xact_lock`), runs conflict overlap detection, requires `p_allow_overlap = true` for intentional double-bookings, and handles insert/update in a single transaction.
+     - Atomic Delete RPC (`delete_artist_calendar_event`): Enforces owner match and blocks manual deletion of platform bookings.
+  2. **Safe Rollback Procedure (`supabase/migrations/20261112_artist_calendar_rollback.sql`):**
+     - Non-destructive safety latch: Checks row count in `artist_calendar_events`. If rows exist, deliberately aborts unless owner backs up data and explicitly overrides via archival rename (`artist_calendar_events_archive_<timestamp>`).
+- **Date & Time Semantics:**
+  - Standard timezone: `Asia/Kolkata` (IST, UTC+05:30).
+  - Exclusive end timestamps for all-day/multi-day blocks: `[start_time, end_time)` half-open interval.
+  - Full overnight support (e.g. 22:00 to 03:00 next day).
+- **Public Availability Status:**
+  - 100% private in Phase 4.6. No public availability RPCs created. Public calendar availability deferred to Phase 5.
+- **Verification:**
+  - Migration SQL reviewed for search path safety (`SET search_path = ''`), security definer constraints, and least privilege.
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run lint`: 0 errors.
+
+### 12.12 Next Steps & Phase Boundaries
+
+- **Phase 4.6 Execution:** Awaiting owner approval before running the migration in Supabase Dashboard SQL Editor.
 - **Phase 5:** NOT STARTED (Strict rule: Phase 5 remains blocked until explicit user sign-off).
 
 
