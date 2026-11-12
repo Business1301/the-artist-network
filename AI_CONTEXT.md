@@ -767,7 +767,41 @@ All integration checks executed with 100% pass rate:
      - `npm run lint`: 0 errors.
      - `npm run build`: 16/16 routes compiled successfully.
 
-### 12.10 Next Steps & Phase Boundaries
+### 12.10 Artist Dashboard Cleanup & Accuracy (Completed)
+
+- **Issue:** The artist dashboard (`/dashboard/artist`) displayed fake sample enquiries, mock gig schedule data, outdated "Review Status" terminology, and lacked actionable profile completeness guidance.
+- **Changes (`app/dashboard/artist/page.tsx`):**
+  1. **Terminology:** Renamed "Review Status" KPI card to "Profile Status" — artists now self-publish, so "review" language was misleading.
+  2. **Sample Data Removed:**
+     - Removed all `mockEnquiries` data (3 fake booking enquiries) and the entire "Enquiries & Requests" tab with interactive Accept/Decline buttons.
+     - Removed all `mockUpcomingGigs` data (4 fake gig schedule entries) and the "Gig Schedule" tab.
+     - Removed the hardcoded "Booking Enquiries: 3" KPI card.
+  3. **Coming Soon Notices:**
+     - Replaced the Enquiries tab with a clean "Booking Enquiries — Coming Soon" notice explaining the future feature.
+     - Replaced the Gig Schedule tab with a "Gig Schedule & Calendar — Coming Soon" notice. Both cards use a "Coming Soon" badge.
+  4. **KPI Cards Updated:**
+     - Retained real data: Portfolio Items (from database), Indicative Fee (from database), Profile Status (from database).
+     - Replaced the fake "Booking Enquiries: 3" card with a "Profile Completion: N%" card reflecting actual completeness.
+  5. **Profile Completeness — Actionable Guidance:**
+     - Implemented field-level completeness tracking using a defined `COMPLETENESS_FIELDS` array, each with a label, weight, and check function.
+     - Fields tracked: Stage name (15%), Category (10%), City/location (10%), Bio 30+ chars (20%), Starting price (15%), Genres (10%), Profile photo (10%), Portfolio items (10%).
+     - When incomplete, missing fields are shown as individually labeled amber badges with a "Complete now →" link to the profile editor.
+     - At 100%, displays a green confirmation message.
+  6. **Tab Restructuring:**
+     - Replaced three-tab layout (Enquiries / Portfolio / Calendar) with cleaner two-tab layout: "Overview & Actions" and "Portfolio Media".
+     - Overview tab contains: Quick Actions grid (Edit Profile & Rates, Manage Portfolio, View Public Profile), Booking Enquiries coming-soon card, Gig Schedule coming-soon card.
+  7. **Quick Actions Grid:**
+     - "Edit Profile & Rates" → `/dashboard/artist/edit`
+     - "Manage Portfolio" → `/dashboard/artist/edit`
+     - "View Public Profile" → `/artists/[slug]` (shown only when profile is published; otherwise shows status-aware placeholder with appropriate guidance).
+  8. **View Public Profile Button:** Header action button now conditionally shown only when profile status is `published`, preventing confusing links to unpublished/suspended profiles.
+  9. **Preserved:** All existing real database connections (profile data, portfolio data, loading states), mobile responsiveness, Navbar/Footer from layout, onboarding callout, suspended/pending banners, profile header card with status badges, verified artist badge.
+- **Verification:**
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run lint`: 0 errors (only pre-existing `<img>` warnings).
+  - `npm run build`: 16/16 routes compiled successfully.
+
+### 12.11 Next Steps & Phase Boundaries
 
 - **Phase 4.5 Stage 3 Final Sign-off:** Self-publishing verification complete. Test artist `Demo Test Artist` is published and available for owner suspension/reinstatement smoke test in `/admin/applications`.
 - **Phase 5:** NOT STARTED (Strict rule: Phase 5 remains blocked until explicit user sign-off).
