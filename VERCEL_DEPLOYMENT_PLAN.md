@@ -34,8 +34,8 @@ If keeping operating costs as close to ₹0 as possible is a hard requirement (p
    - **Cost:** Free tier allows personal commercial projects up to 100GB bandwidth / 300 build minutes per month.
 
 ### 1.3 Recommended Phased Rollout
-- **Phase A (Immediate Private Preview):** Deploy to Vercel with **Vercel Authentication / Deployment Protection enabled** for internal review and end-to-end verification.
-- **Phase B (Public Commercial Launch):** Upgrade Vercel to Pro ($20/mo) OR containerize via Docker/Coolify on a ₹340/mo VPS.
+- **Phase A (Immediate Private Preview):** Deploy to Vercel with **Vercel Authentication enabled for All Deployments** for internal review and end-to-end verification. Commercial compliance is not violated during private, non-commercial developer evaluation.
+- **Phase B (Public Commercial Launch):** Commercial hosting-plan compliance must be confirmed. The account must be upgraded to Vercel Pro ($20/seat/mo) OR containerized via Docker/Coolify on a ₹340/mo VPS prior to accepting real business/artist traffic or launching marketplace transactions.
 
 ---
 
@@ -59,7 +59,10 @@ For published artists, `rejection_reason` is returned as a column key with a `nu
 
 ### 2.3 Proposed Long-Term Hardening (Requires Approval Before Execution)
 
-To achieve strict database-level column encapsulation without risking PostgREST runtime errors on application queries, the recommended architecture is a **Security Invoker View**:
+> [!IMPORTANT]
+> **Database Security Note on Views vs. Tables**: In PostgreSQL and Supabase PostgREST, creating a new sanitized view alone (`public.public_artists`) **does not** automatically revoke or limit direct client access to the underlying `public.artist_profiles` table. Because PostgREST automatically exposes every table in the `public` schema that has `GRANT SELECT`, anonymous clients could still query `/rest/v1/artist_profiles` directly unless table-level SELECT on `artist_profiles` is explicitly restricted. To achieve complete database-level encapsulation, the migration must both create the view AND restrict direct access to the underlying table, while ensuring existing artist editing/publishing functions and Server Actions continue working without regression.
+
+To achieve strict database-level column encapsulation without risking PostgREST runtime errors on application queries, the recommended architecture is a **Security Invoker View** paired with targeted privilege adjustments:
 
 ```sql
 -- DRAFT MIGRATION: 20261113_public_artist_directory_view.sql
@@ -150,6 +153,11 @@ Inspection of `@supabase/ssr` (`node_modules/@supabase/ssr/dist/main/utils/const
    - **Output Directory:** `.next` (default)
    - **Install Command:** `npm install` (default)
 
+> [!WARNING]
+> **Immediate Production Deployment on Import**: When connecting a GitHub repository, Vercel designates the `master` branch as the Production branch by default. The initial import will immediately trigger an automatic build and assign a production URL. To avoid launching a publicly accessible site before private testing is complete:
+> - Enable **Vercel Authentication** under Project Settings → Deployment Protection and select **"All Deployments"** (protects Production as well as Previews).
+> - Alternatively, create a dedicated staging/preview branch in GitHub (e.g., `preview`) and import that branch first before pointing Vercel to `master`.
+
 ### Step 3: Configure Environment Variables in Vercel
 In the Vercel Project Import screen (under **Environment Variables**), add the following:
 
@@ -162,21 +170,25 @@ In the Vercel Project Import screen (under **Environment Variables**), add the f
 > **Zero Secrets Required:** Do NOT add `SUPABASE_SERVICE_ROLE_KEY`, database passwords, or administrative credentials to Vercel. The application does not use them and does not require them.
 
 ### Step 4: Configure Vercel Deployment Protection (Private Preview)
-To ensure the preview deployment is protected from public internet crawlers and unauthorized visitors:
+To ensure the deployment is protected from public internet crawlers and unauthorized visitors:
 1. In Vercel Project Dashboard, go to **Settings → Deployment Protection**.
-2. Enable **Vercel Authentication** (limits access to your Vercel team) OR **Password Protection** (set a private viewer password).
-3. This prevents any public indexing before final acceptance testing.
+2. Under **Deployment Protection**, select **Vercel Authentication** and set scope to **"All Deployments"** (limits access to logged-in members of your Vercel team across both production and preview deployments).
+3. **Note on Password Protection**: Standard shared-password protection (a single passphrase for external reviewers without Vercel accounts) is an Advanced Deployment Protection paid feature on Vercel Pro/Enterprise. For private developer preview, Vercel Authentication with "All Deployments" protection is the standard mechanism included on Vercel team accounts.
 
 ### Step 5: Update Supabase Auth Configuration
 Once Vercel assigns your preview domain (e.g., `https://the-artist-network.vercel.app`):
 1. Open the [Supabase Dashboard](https://supabase.com/dashboard).
 2. Navigate to **Authentication → URL Configuration**.
-3. Set **Site URL** to:
-   `https://the-artist-network.vercel.app` (or your custom domain).
-4. In **Redirect URLs**, add:
-   - `https://the-artist-network.vercel.app/**`
-   - `https://the-artist-network-*-your-team.vercel.app/**` (for preview branches)
-   - `http://localhost:3000/**` (for ongoing local development)
+3. **Site URL (Stable Canonical Domain)**:
+   Set **Site URL** to:
+   `https://the-artist-network.vercel.app` (or your primary custom domain).
+   > [!IMPORTANT]
+   > The **Site URL** must be stable. It is the default redirect target for password reset emails, magic links, and invite confirmations. Do not change it on every dynamic preview.
+4. **Redirect URLs Allowlist (Dynamic Previews & Local Development)**:
+   In **Redirect URLs**, add the wildcard patterns for all dynamic Vercel branch previews and local testing:
+   - `https://the-artist-network.vercel.app/**` (production/canonical)
+   - `https://the-artist-network-*-your-team.vercel.app/**` (dynamic branch previews)
+   - `http://localhost:3000/**` (ongoing local development)
 5. Save changes.
 
 ### Step 6: Safe Rollback Procedure
