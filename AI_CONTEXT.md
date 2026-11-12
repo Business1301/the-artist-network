@@ -1084,11 +1084,28 @@ All integration checks executed with 100% pass rate:
     - `npm run build`: 17/17 routes compiled cleanly in 815ms.
     - Live runtime regression suite (`scratch/verify_runtime_regression.mjs`): **16/16 PASSED**.
 
-### 12.19 Phase Boundaries & Handover
+### 12.19 Vercel Preview Deployment Preparation (READY)
+
+- **Status (2026-11-12):** Deployment preparation completed and documented in `VERCEL_DEPLOYMENT_PLAN.md`.
+- **Hosting Compliance Analysis:**
+  - Vercel Hobby plan is strictly for personal, non-commercial use. Can be used for internal closed development previews only.
+  - Commercial public marketplace launch requires Vercel Pro ($20/month per seat) or low-cost self-hosted Docker/Coolify alternative on a VPS (~₹340/month).
+- **Security & Privacy Posture:**
+  - Verified anonymous callers cannot access legal names (0 rows from `public.profiles`) or unpublished artists.
+  - Published artists return `rejection_reason: null`. Proposed optional `public.public_artists` security invoker view for strict long-term column encapsulation.
+  - Documented `@supabase/ssr` cookie architecture (`httpOnly: false` by design for client SDK synchronization; security anchored in PostgreSQL RLS, triggers, and RPC search_path locks).
+  - Confirmed 0 server secrets or database passwords are required by Vercel builds (`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` only).
+- **Deployment Safety Checklist:**
+  - 17/17 routes compiled cleanly with 0 TypeScript/ESLint errors.
+  - Detailed pre-deployment and post-preview verification checklist created.
+  - Rollback procedure documented.
+
+### 12.20 Phase Boundaries & Handover
 
 - **Phase 4.6 (Artist Calendar & Availability):** ✅ FULLY COMPLETED & LIVE-VERIFIED.
 - **Social Media Links (Discovery & Profiles):** ✅ FULLY COMPLETED.
-- **Pre-Launch Security Audit & Fixes:** ✅ FULLY COMPLETED & VERIFIED.
+- **Pre-Launch Security Hardening:** ✅ FULLY COMPLETED & COMMITTED (`a7500f7`).
+- **Vercel Preview Deployment Preparation:** ✅ FULLY SPECIFIED (`VERCEL_DEPLOYMENT_PLAN.md`).
 - **Phase 5 (Public Enquiries & Booking Workflow):** ⛔ STRICTLY BLOCKED — DO NOT START until explicit user sign-off.
 
 
