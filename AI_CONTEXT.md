@@ -973,18 +973,44 @@ All integration checks executed with 100% pass rate:
       `IF p_start_time <= pg_catalog.clock_timestamp() THEN RETURN error...`
     - **Concurrency & Overlap Safety:** Preserves `pg_advisory_xact_lock` per artist, atomic `[start, end)` half-open interval overlap detection, and explicit `p_allow_overlap` confirmation requirement.
     - **Permissions:** Explicit `REVOKE ALL FROM PUBLIC, anon; GRANT EXECUTE TO authenticated; NOTIFY pgrst, 'reload schema';`. No unrelated objects or triggers dropped.
-    - Status: Prepared for owner manual application via Supabase SQL Editor.
+    - Status: Successfully executed manually by project owner in Supabase SQL Editor on 2026-11-12.
+
+  - **Live Post-Migration Database Verification (2026-11-12):**
+    - Executed live API test suite against Supabase PostgREST & RPC endpoints (`verify_live_past_bookings.mjs`):
+    - **21/21 Live Checks PASSED (100% success rate, 0 lingering test records):**
+      - `[CHECK-1.1]` Artist Authentication: Verified (`userId: 688c7416-7d71-44cf-ba09-b519fdf26f15`).
+      - `[CHECK-1.2]` Business Authentication: Verified (`userId: b4db2908-5454-43e6-81a4-c80ef02d07f5`).
+      - `[CHECK-1.3]` Anonymous Access: Blocked with HTTP 401 (`permission denied for function save_artist_calendar_event`).
+      - `[CHECK-1.4]` Business Role Access: Blocked with Postgres error 42501 (`Only registered artists can manage calendar events`).
+      - `[CHECK-1.5]` Direct Table Mutation: Revoked, HTTP 403 (`permission denied for table artist_calendar_events`).
+      - `[CHECK-2.1]` Yesterday's Booking: Rejected by live RPC (`Bookings must start in the future. Please select a later date or time.`).
+      - `[CHECK-2.2]` Earlier Today's Booking: Rejected by live RPC (`Bookings must start in the future. Please select a later date or time.`).
+      - `[CHECK-2.3]` All-Day Today Booking: Rejected by live RPC (Midnight IST in past).
+      - `[CHECK-2.4]` All-Day Tomorrow Booking: Created successfully (`event_id: 08ab6277-423c-4dfd-99dc-7ab10b3a42ad`).
+      - `[CHECK-2.5]` Future Timed Booking: Created successfully (`event_id: 70908806-7b2f-4450-8fb5-7e2d4e51e33b`).
+      - `[CHECK-2.6]` Rescheduling Future Event to Past: Rejected by live RPC (`Rescheduled events must start in the future. Please select a later date or time.`).
+      - `[CHECK-2.7a]` Atomic Conflict Detection: Detected overlap with existing confirmed gig when `p_allow_overlap = false`.
+      - `[CHECK-2.7b]` Explicit Overlap Confirmation: Overlap allowed when `p_allow_overlap = true` (`event_id: 2998954e-cf43-43df-a259-71295e980e60`).
+      - `[CHECK-3.0]` Preparation for Started Event: Created event starting in 3 seconds (`event_id: 643abee4-fddb-463c-aa03-a9500337430b`), waited 5s for `clock_timestamp() > start_time`.
+      - `[CHECK-3.1]` Modifying `start_time` on Started Event: Rejected by live RPC (`Scheduling details (start time, end time, and all-day setting) cannot be modified for events that have already started or concluded.`).
+      - `[CHECK-3.2]` Modifying `end_time` on Started Event: Rejected by live RPC (`Scheduling details... cannot be modified`).
+      - `[CHECK-3.3]` Modifying `is_all_day` on Started Event: Rejected by live RPC (`Scheduling details... cannot be modified`).
+      - `[CHECK-3.4]` Updating Metadata on Started Event: Succeeded (title, status, venue, fee, notes updated cleanly).
+      - `[CHECK-3.5]` Metadata Persistence: Verified in Supabase via SELECT.
+      - `[CHECK-4.1]` Test Cleanup: All 4 test events deleted via `delete_artist_calendar_event` RPC (4/4 cleaned).
+      - `[CHECK-4.2]` Residual Audit: 0 lingering test events remain in `artist_calendar_events`.
 
   - **Automated QA Verification:**
     - `scratch/test_past_bookings.ts`: **19/19 PASSED**.
     - `scratch/test_calendar_qa.ts`: **24/24 PASSED**.
+    - `scratch/verify_live_past_bookings.mjs`: **21/21 PASSED**.
     - `npx tsc --noEmit`: **0 errors**.
     - `npm run lint`: **0 errors** (9 acceptable `<img>` warnings).
     - `npm run build`: **17/17 routes generated successfully in 724ms**.
 
 ### 12.16 Phase Boundaries & Handover
 
-- **Phase 4.6 (Artist Calendar & Availability):** ✅ FULLY COMPLETED (Stages 1-4 + Past-Date Bugfix verified and committed).
+- **Phase 4.6 (Artist Calendar & Availability):** ✅ FULLY COMPLETED & LIVE-VERIFIED (All stages, bugfixes, and database RPC updates verified on Supabase).
 - **Phase 5 (Public Enquiries & Booking Workflow):** ⛔ STRICTLY BLOCKED — DO NOT START until explicit user sign-off.
 
 
