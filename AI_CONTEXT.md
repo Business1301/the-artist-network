@@ -1130,9 +1130,9 @@ All integration checks executed with 100% pass rate:
 - **Target Environments:**
   - Netlify Live: `https://artist-net-v1.netlify.app` (Running commit `f271d08`)
   - Local Preview: `http://localhost:3000` (Running commit `db3cafe` with Next.js 16.4.3 Turbopack)
-- **Comprehensive Audit Results (46 Total Checks Recorded):**
-  - **Passed:** 39 checks (84.8%).
-  - **Actionable / Security Findings:** 7 checks (Netlify testing visitor password absent, 5 unpushed legal routes on live Netlify, 1 moderate Next.js advisory for unused `unstable_cache`).
+- **Comprehensive Audit Results (56 Total Checks Reconciled):**
+  - **Passed:** 49 checks (87.5% — 14 Netlify Live, 23 Supabase DB/API, 12 Local Runtime).
+  - **Actionable / Security Findings:** 7 checks (Netlify visitor password absent, 5 unpushed legal routes on live Netlify, 1 moderate Next.js advisory for unused `unstable_cache`).
 - **Live Netlify Security Posture:**
   - `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Strict-Transport-Security`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` verified live on Netlify edge nodes.
   - HTTP automatically redirects to HTTPS with HTTP 301.
