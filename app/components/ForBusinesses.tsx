@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const perks = [
   {
     icon: "🏢",
@@ -17,7 +19,7 @@ const perks = [
   {
     icon: "🔍",
     title: "Reviewed Profiles",
-    description: "Every profile is reviewed before it goes public. Browse portfolios and make informed decisions.",
+    description: "Profiles undergo administrative review before publication. Browse portfolios and explore creative talent.",
   },
 ];
 
@@ -45,17 +47,23 @@ export default function ForBusinesses() {
             </h2>
             <p className="text-purple-200 text-base leading-relaxed mb-8">
               Whether you&apos;re planning a corporate event, setting the mood at a restaurant,
-              or producing a large-scale festival — The Artist Network gives you direct access
-              to a wide range of creative professionals across India.
+              or producing a festival — The Artist Network gives you direct access
+              to creative talent across India.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4">
-              <button className="px-7 py-3.5 bg-white text-purple-700 font-bold rounded-full hover:bg-purple-50 hover:scale-105 transition-all text-sm shadow-lg">
-                Post a Requirement
-              </button>
-              <button className="px-7 py-3.5 border border-white/30 text-white font-bold rounded-full hover:bg-white/10 transition-all text-sm">
-                Learn More
-              </button>
+              <Link
+                href="/artists"
+                className="px-7 py-3.5 bg-white text-purple-700 font-bold rounded-full hover:bg-purple-50 hover:scale-105 transition-all text-sm shadow-lg text-center"
+              >
+                Discover Artists
+              </Link>
+              <Link
+                href="/signup"
+                className="px-7 py-3.5 border border-white/30 text-white font-bold rounded-full hover:bg-white/10 transition-all text-sm text-center"
+              >
+                Register as Venue
+              </Link>
             </div>
           </div>
 

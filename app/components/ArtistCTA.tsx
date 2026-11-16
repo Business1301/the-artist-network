@@ -74,9 +74,9 @@ export default async function ArtistCTA({
       // 5. Logged-in business user
       badge = "Venue & Business Portal";
       badgeColor = "text-purple-300";
-      heading = "Find & Hire Exceptional Artists";
+      heading = "Find & Discover Exceptional Artists";
       description =
-        "Source verified singers, DJs, live bands, dancers, and visual artists tailored for your venue, corporate functions, and private celebrations.";
+        "Discover singers, DJs, live bands, dancers, and visual artists tailored for your venue, corporate functions, and private celebrations.";
       primaryButton = {
         label: "Discover Artists",
         href: "/artists",
@@ -88,7 +88,7 @@ export default async function ArtistCTA({
         href: "/dashboard/restaurant",
       };
       footnote =
-        "Browse verified portfolios, compare starting rates, and message creative talent directly.";
+        "Browse artist portfolios, compare indicative rates, and explore creative talent across India.";
     } else if (resolvedUser.role === "artist") {
       const status = resolvedArtistStatus?.profile_status;
 
@@ -129,14 +129,14 @@ export default async function ArtistCTA({
             : "/artists",
         };
         footnote =
-          "Keep your portfolio and pricing up-to-date to maximize inbound booking requests.";
+          "Keep your portfolio and indicative rates up-to-date to present your work to prospective clients.";
       } else if (status === "pending_review") {
         // Artist profile submitted and awaiting moderation
         badge = "Submission Under Review";
         badgeColor = "text-amber-300";
         heading = "Your Artist Profile Is Under Review";
         description =
-          "Our moderation team is reviewing your profile and portfolio. You will be notified once verified and published to the directory.";
+          "Our moderation team is reviewing your profile and portfolio. You will be notified once reviewed and published to the directory.";
         primaryButton = {
           label: "View Application Status",
           href: "/dashboard/artist",
@@ -148,14 +148,14 @@ export default async function ArtistCTA({
           href: "/dashboard/artist/edit",
         };
         footnote =
-          "Verification typically takes 24–48 hours. Profiles are checked to maintain high marketplace standards.";
+          "Administrative review typically takes 24–48 hours. Submissions are checked to maintain high community standards.";
       } else {
         // 2. Logged-in artist with no profile or an unpublished draft (draft, rejected, or not yet created)
         badge = "Artist Profile Setup";
         badgeColor = "text-purple-300";
         heading = "Complete Your Artist Profile";
         description =
-          "Your artist account is active, but your profile is not live yet. Add your stage details, genres, pricing, and portfolio to submit for verification.";
+          "Your artist account is active, but your profile is not live yet. Add your stage details, genres, pricing, and portfolio to submit for review.";
         primaryButton = {
           label: "Continue Profile Setup",
           href: "/dashboard/artist/edit",
@@ -167,7 +167,7 @@ export default async function ArtistCTA({
           href: "/dashboard/artist",
         };
         footnote =
-          "Complete your profile to unlock client enquiries and get discovered across India.";
+          "Complete your profile to showcase your talent and get discovered across India.";
       }
     }
   }

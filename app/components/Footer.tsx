@@ -1,40 +1,39 @@
 import Link from "next/link";
 
-// Footer links per PROJECT_PLAN.md §5.10
 const footerColumns = [
   {
     heading: "Platform",
     links: [
       { label: "Discover Artists", href: "/artists" },
       { label: "Categories", href: "/categories" },
-      { label: "Opportunities", href: "/opportunities" },
+      { label: "Opportunities Preview", href: "/opportunities" },
       { label: "How It Works", href: "/#how-it-works" },
-      { label: "Restaurant Portal (Demo)", href: "/dashboard/restaurant" },
+      { label: "For Venues & Clients", href: "/#for-businesses" },
     ],
   },
   {
     heading: "For Artists",
     links: [
-      { label: "Artist Dashboard (Demo)", href: "/dashboard/artist" },
-      { label: "Join as an Artist", href: "/#how-it-works" },
-      { label: "How It Works for Talent", href: "/#how-it-works" },
-      { label: "Portfolio Guidelines", href: "/#how-it-works" },
+      { label: "Join as an Artist", href: "/signup" },
+      { label: "Artist Dashboard", href: "/dashboard/artist" },
+      { label: "Artist Calendar", href: "/dashboard/artist/calendar" },
+      { label: "Community Guidelines", href: "/community-guidelines" },
     ],
   },
   {
-    heading: "Company",
+    heading: "Support & Trust",
     links: [
-      { label: "About Us", href: "/" },
-      { label: "Contact Us", href: "/" },
-      { label: "Blog", href: "/" },
+      { label: "Contact Us", href: "/contact" },
+      { label: "Community Guidelines", href: "/community-guidelines" },
+      { label: "Platform Disclaimer", href: "/disclaimer" },
     ],
   },
   {
-    heading: "Trust & Legal",
+    heading: "Legal & Privacy",
     links: [
-      { label: "Community Guidelines", href: "/" },
-      { label: "Privacy Policy", href: "/" },
-      { label: "Terms of Service", href: "/" },
+      { label: "Terms & Conditions", href: "/terms" },
+      { label: "Privacy Policy", href: "/privacy" },
+      { label: "Platform Disclaimer", href: "/disclaimer" },
     ],
   },
 ];
@@ -57,11 +56,11 @@ export default function Footer() {
               </span>
             </Link>
             <p className="text-gray-400 text-sm leading-relaxed mb-6 max-w-sm">
-              India&apos;s marketplace for discovering, hiring and supporting creative talent. Connecting artists with businesses, event organizers, venues and clients.
+              India&apos;s marketplace for discovering, exploring, and connecting with creative talent. Connecting artists with businesses, event organizers, venues, and clients.
             </p>
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-900 border border-gray-800 text-gray-400 text-xs">
-              <span className="w-2 h-2 rounded-full bg-green-500" aria-hidden="true" />
-              Phase 1 Visual Prototype
+              <span className="w-2 h-2 rounded-full bg-amber-400" aria-hidden="true" />
+              Testing &amp; Evaluation Preview
             </div>
           </div>
 
@@ -73,7 +72,7 @@ export default function Footer() {
               </h4>
               <ul className="space-y-2.5">
                 {col.links.map((link) => (
-                  <li key={link.label}>
+                  <li key={`${col.heading}-${link.label}`}>
                     <Link
                       href={link.href}
                       className="text-gray-400 hover:text-purple-400 text-sm transition-colors"
@@ -92,11 +91,22 @@ export default function Footer() {
       <div className="border-t border-gray-900 bg-gray-950/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500">
           <p>
-            © 2026 The Artist Network. All rights reserved.
+            © 2026 The Artist Network. Pre-launch testing preview. Commercial booking &amp; payments are not yet operational.
           </p>
-          <p>
-            Built with Next.js, TypeScript &amp; Tailwind CSS.
-          </p>
+          <div className="flex items-center gap-4">
+            <Link href="/terms" className="hover:text-purple-400 transition-colors">
+              Terms
+            </Link>
+            <Link href="/privacy" className="hover:text-purple-400 transition-colors">
+              Privacy
+            </Link>
+            <Link href="/contact" className="hover:text-purple-400 transition-colors">
+              Contact
+            </Link>
+            <Link href="/disclaimer" className="hover:text-purple-400 transition-colors">
+              Disclaimer
+            </Link>
+          </div>
         </div>
       </div>
     </footer>

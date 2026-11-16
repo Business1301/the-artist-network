@@ -141,3 +141,4 @@ Test the following directly on your live URL:
 If a bug is pushed to production:
 - **On Netlify**: Go to **Deploys** → click any previous working deploy → click **"Publish deploy"**. The site will instantly revert to the previous version with zero downtime.
 - **On Vercel**: Go to **Deployments** → click the `...` menu on a prior deployment → click **"Instant Rollback"**.
+

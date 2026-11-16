@@ -22,7 +22,7 @@ export const instant = false;
 export const metadata: Metadata = {
   title: "Discover Live Artists & Performers in India | The Artist Network",
   description:
-    "Explore verified singers, DJs, live bands, stand-up comedians, and performers across India. Filter by city, budget, and genre to book top talent.",
+    "Explore singers, DJs, live bands, stand-up comedians, and performers across India. Filter by city, starting rates, and genre to discover creative talent.",
 };
 
 // Fallback baseline lists ensuring filters are populated even before artists are added
@@ -199,7 +199,7 @@ async function DirectoryContent({
             Discover Live Artists
           </h1>
           <p className="text-xs sm:text-sm text-gray-500 mt-1">
-            Book verified singers, DJs, bands, and performers across India
+            Explore singers, DJs, live bands, and performers across India
           </p>
         </div>
 

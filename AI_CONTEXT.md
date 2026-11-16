@@ -1100,13 +1100,37 @@ All integration checks executed with 100% pass rate:
   - Detailed pre-deployment and post-preview verification checklist created.
   - Rollback procedure documented.
 
-### 12.20 Phase Boundaries & Handover
+### 12.20 Phase 4.7: Pre-Launch Legal Compliance, Informational Pages & Footer Hardening (COMPLETED)
+
+- **Completed (2026-11-17):**
+  - **New Legal & Information Pages Created (5 dynamic routes):**
+    - `/terms` (`app/terms/page.tsx`): Comprehensive Terms & Conditions tailored for Indian talent discovery. Formulates scope, 18+ eligibility, artist/business obligations, IP retention with limited display license, IT Act 2021 takedowns, moderation rights, and clear disclosures that online booking checkouts, escrows, and payments are not currently active.
+    - `/privacy` (`app/privacy/page.tsx`): Detailed data architecture policy aligned with the Digital Personal Data Protection Act, 2023 (DPDP Act) and IT Act 2000. Delineates public showcase data from confidential data (including legal real names and private artist calendar event metadata: client contacts, fees, notes). Audits `@supabase/ssr` cookies and notes absence of third-party ad trackers.
+    - `/contact` (`app/contact/page.tsx`): Professional communication desk with structured channels (General, Artist/Venue Support, Grievance Officer, Copyright Takedown). Features zero fabricated company details and includes explicit placeholders for owner details.
+    - `/community-guidelines` (`app/community-guidelines/page.tsx`): Code of conduct emphasizing profile authenticity, respect, intellectual property, zero tolerance for impersonation, and explains actual admin moderation enforcement.
+    - `/disclaimer` (`app/disclaimer/page.tsx`): Comprehensive disclosures explaining platform discovery scope, clarifying that artist verification does not warrant performance quality or reliability, noting indicative pricing, disclaiming third-party external links, and preserving non-waivable statutory rights.
+  - **Footer Overhaul (`app/components/Footer.tsx`):**
+    - Replaced outdated "Phase 1 Visual Prototype" badge with "Testing & Evaluation Preview" (amber status).
+    - Removed broken/mock links and wired functional links to `/terms`, `/privacy`, `/contact`, `/community-guidelines`, `/disclaimer`, `/artists`, `/categories`, `/opportunities`, and `/dashboard/artist/calendar`.
+  - **Homepage & Directory Claims Alignment:**
+    - `app/components/DashboardShowcase.tsx`: Replaced mock statistics (fake enquiries and fake gig counts) with actual implemented features: Artist Workspace (Profile, Portfolio, Private Calendar, Socials) and Venue Workspace (Discovery Directory, Filters, YouTube previews, Roadmap Transparency).
+    - `app/components/HowItWorks.tsx`: Calibrated Step 3 for clients ("Connect & Plan") and artists ("Manage Schedule & Grow") to reflect current capabilities without claiming automated booking.
+    - `app/components/ForBusinesses.tsx`: Replaced inactive buttons with active links to `/artists` and `/signup`.
+    - `app/artists/page.tsx`: Calibrated sub-header and metadata to emphasize discovery rather than claiming instant booking.
+    - `app/components/ArtistCTA.tsx`: Clarified administrative review versus verification across all user roles.
+  - **Verification & Build:**
+    - `npx tsc --noEmit`: 0 errors.
+    - `npm run lint`: 0 errors (9 pre-existing `<img>` warnings unchanged).
+    - `npm run build`: 22/22 routes generated cleanly with Turbopack and Partial Prerendering.
+  - **Checklist Document Created:** `LEGAL_COMPLIANCE_CHECKLIST.md`.
+
+### 12.21 Phase Boundaries & Handover
 
 - **Phase 4.6 (Artist Calendar & Availability):** ✅ FULLY COMPLETED & LIVE-VERIFIED.
-- **Social Media Links (Discovery & Profiles):** ✅ FULLY COMPLETED.
+- **Phase 4.7 (Legal Pages, Compliance & Footer):** ✅ FULLY COMPLETED.
 - **Pre-Launch Security Hardening:** ✅ FULLY COMPLETED & COMMITTED (`a7500f7`).
-- **Vercel Preview Deployment Preparation:** ✅ FULLY SPECIFIED (`VERCEL_DEPLOYMENT_PLAN.md`).
 - **Phase 5 (Public Enquiries & Booking Workflow):** ⛔ STRICTLY BLOCKED — DO NOT START until explicit user sign-off.
+- **Git / Netlify Guard:** Pushing to GitHub triggers Netlify automated build. Do not push without owner authorization.
 
 
 
