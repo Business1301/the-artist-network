@@ -1153,8 +1153,74 @@ All integration checks executed with 100% pass rate:
 - **Phase 4.6 (Artist Calendar & Availability):** ✅ FULLY COMPLETED & LIVE-VERIFIED.
 - **Phase 4.7 (Legal Pages, Compliance & Footer):** ✅ FULLY COMPLETED.
 - **Pre-Launch Security & Live Testing:** ✅ FULLY COMPLETED.
-- **Phase 5 (Public Enquiries & Booking Workflow):** ⛔ STRICTLY BLOCKED — DO NOT START until explicit user sign-off.
+- **Phase 5.1 Stage 1 (Booking Enquiry Schema & RPCs):** ✅ FULLY COMPLETED & LIVE-VERIFIED in Supabase.
+- **Phase 5.1 Stage 2 (Server Actions & Validation):** ⏸️ AWAITING OWNER APPROVAL.
 - **Git / Netlify Guard:** Pushes to GitHub trigger automatic Netlify builds. Do not push without owner authorization.
+
+---
+
+## 13. Phase 5.1 Stage 1 — Secure Booking Enquiry Database Architecture & Live Verification (2026-11-17)
+
+### 13.1 Database Migration Installed
+- **Migration:** `supabase/migrations/20261117_booking_enquiries.sql`
+- **Execution:** Successfully executed manually in the Supabase Dashboard SQL Editor by the platform owner ("Success. No rows returned").
+- **Live Catalog Objects:**
+  - `public.booking_enquiries`: Core enquiry records.
+  - `public.booking_enquiry_events`: Immutable audit trail for every status transition.
+  - 5 performance and quota indexes (`idx_booking_enquiries_business`, `idx_booking_enquiries_artist`, `idx_booking_enquiries_status`, `idx_booking_enquiries_open_pair`, `idx_booking_enquiry_events_enquiry`).
+  - Trigger `trg_booking_enquiries_updated_at` firing `public.set_booking_enquiry_updated_at()`.
+  - 4 atomic `SECURITY DEFINER` RPCs with `SET search_path = ''`.
+
+### 13.2 Client Privilege Revocation & RLS Security
+- **Direct Client Writes Revoked:** `REVOKE INSERT, UPDATE, DELETE ON public.booking_enquiries, public.booking_enquiry_events FROM authenticated, anon, PUBLIC;` (enforced via PostgreSQL privilege system, error code `42501 permission denied`).
+- **Client Read Policies (RLS):**
+  - Authenticated businesses can only select enquiries where `business_id = (SELECT auth.uid())`.
+  - Authenticated artists can only select enquiries where `artist_id = (SELECT auth.uid())`.
+  - Authenticated admins can select all enquiries via `public.is_admin()`.
+  - Audit events are viewable only if the caller has select access to the parent enquiry.
+  - Anonymous callers receive 0 rows on all queries.
+
+### 13.3 Workflow & Status Lifecycle
+- **Status Categories:**
+  - **Open Statuses:** `submitted`, `seen`, `info_requested`, `clarified` (consume open enquiry quotas).
+  - **Terminal Statuses:** `interested`, `declined`, `withdrawn` (do not consume open enquiry quotas; immutable/concluded).
+- **Semantics of `interested`:** Represents mutual non-binding interest expression. Does **NOT** create a confirmed booking, generate an invoice, transfer funds, or place an event on the artist's calendar.
+- **Calendar Isolation Invariant:** Zero integration with `public.artist_calendar_events`. Enquiry operations never mutate or lock calendar dates.
+
+### 13.4 Atomic Stored Procedures (RPCs)
+All RPCs enforce authentication via `(SELECT auth.uid())`, check profile roles in `public.profiles`, use transaction-scoped advisory locks (`pg_advisory_xact_lock`), and maintain immutable event records in `public.booking_enquiry_events`:
+1. `public.submit_booking_enquiry(p_artist_id, p_event_date, p_event_type, p_event_location, p_requirements, p_indicative_budget, p_business_message)`:
+   - Validates caller role is `business`.
+   - Validates target artist exists and is `published` (rejects suspended/draft/rejected artists).
+   - Rejects self-enquiries.
+   - Enforces future date in Indian Standard Time (`p_event_date > (timezone('Asia/Kolkata', now()))::date`).
+   - Rejects duplicate open enquiries for the same business, artist, and event date.
+   - Enforces active pair quota: maximum 3 open enquiries per business–artist pair.
+   - Enforces global business quota: maximum 10 open enquiries across all artists.
+   - Enforces velocity rate limit: maximum 5 enquiries per hour per business.
+2. `public.respond_to_booking_enquiry(p_enquiry_id, p_action, p_response_text)`:
+   - Validates caller is the target `artist`.
+   - Actions supported:
+     - `'mark_seen'`: Idempotent transition from `submitted` to `seen`.
+     - `'request_info'`: Transition to `info_requested` (requires `p_response_text >= 5` chars).
+     - `'express_interest'`: Transition to `interested` (valid from `submitted`, `seen`, `clarified`; blocked if `info_requested`).
+     - `'decline'`: Terminal transition to `declined` (optional reason).
+3. `public.clarify_booking_enquiry(p_enquiry_id, p_clarification_text)`:
+   - Validates caller is the owning `business`.
+   - Allowed only when status is `info_requested`.
+   - Transitions status to `clarified` and records audit event. Enforces single-cycle clarification (subsequent calls rejected until artist responds again).
+4. `public.withdraw_booking_enquiry(p_enquiry_id, p_reason)`:
+   - Validates caller is the owning `business`.
+   - Allowed only on open enquiries (`submitted`, `seen`, `info_requested`, `clarified`).
+   - Blocked on terminal enquiries (`interested`, `declined`, `withdrawn`).
+
+### 13.5 Live Verification Results
+- **Report Document:** `PHASE_5_1_STAGE_1_VERIFICATION.md`
+- **Result:** **34 / 34 checks PASSED (100%)** against live Supabase PostgreSQL database.
+- **Test Accounts Used:** Dedicated `.example` test accounts (Business, Secondary Business, Published Artist, Suspended Artist).
+- **Data Hygiene:** All test records were moved to terminal states; exactly 0 active/open enquiries remain in the database.
+- **Stage 2 Readiness:** Database layer is 100% verified and ready for Next.js Server Actions and Zod validation.
+
 
 
 
