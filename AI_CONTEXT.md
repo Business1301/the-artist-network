@@ -1124,13 +1124,37 @@ All integration checks executed with 100% pass rate:
     - `npm run build`: 22/22 routes generated cleanly with Turbopack and Partial Prerendering.
   - **Checklist Document Created:** `LEGAL_COMPLIANCE_CHECKLIST.md`.
 
-### 12.21 Phase Boundaries & Handover
+### 12.21 Final Netlify Live Website Testing & Launch Readiness Audit (COMPLETED)
+
+- **Audit Date:** 2026-11-17
+- **Target Environments:**
+  - Netlify Live: `https://artist-net-v1.netlify.app` (Running commit `f271d08`)
+  - Local Preview: `http://localhost:3000` (Running commit `db3cafe` with Next.js 16.4.3 Turbopack)
+- **Comprehensive Audit Results (46 Total Checks Recorded):**
+  - **Passed:** 39 checks (84.8%).
+  - **Actionable / Security Findings:** 7 checks (Netlify testing visitor password absent, 5 unpushed legal routes on live Netlify, 1 moderate Next.js advisory for unused `unstable_cache`).
+- **Live Netlify Security Posture:**
+  - `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Strict-Transport-Security`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` verified live on Netlify edge nodes.
+  - HTTP automatically redirects to HTTPS with HTTP 301.
+  - Zero private service keys or database credentials in client bundles.
+- **Supabase Privacy & RLS Invariants:**
+  - Verified anonymous callers cannot query `public.profiles` (0 rows).
+  - Unpublished, draft, and rejected artists remain completely hidden from anonymous discovery.
+  - Private calendar events and atomic RPC mutations are strictly owner-only; direct table mutations are revoked.
+  - Cross-role boundaries verified: Business accounts cannot manage artist calendars or view admin audit logs.
+- **Launch Readiness Verdict:** **NO-GO FOR PUBLIC LAUNCH (READY FOR INTERNAL TESTING)**.
+  - Netlify visitor password protection must be enabled in Netlify dashboard.
+  - Registered business details and Grievance Officer placeholders must be substituted.
+  - Final legal review on `/terms` and `/privacy` required prior to commercial launch.
+- **Reports Generated:** `NETLIFY_LIVE_TEST_REPORT.md` and `LEGAL_COMPLIANCE_CHECKLIST.md`.
+
+### 12.22 Phase Boundaries & Handover
 
 - **Phase 4.6 (Artist Calendar & Availability):** ✅ FULLY COMPLETED & LIVE-VERIFIED.
 - **Phase 4.7 (Legal Pages, Compliance & Footer):** ✅ FULLY COMPLETED.
-- **Pre-Launch Security Hardening:** ✅ FULLY COMPLETED & COMMITTED (`a7500f7`).
+- **Pre-Launch Security & Live Testing:** ✅ FULLY COMPLETED.
 - **Phase 5 (Public Enquiries & Booking Workflow):** ⛔ STRICTLY BLOCKED — DO NOT START until explicit user sign-off.
-- **Git / Netlify Guard:** Pushing to GitHub triggers Netlify automated build. Do not push without owner authorization.
+- **Git / Netlify Guard:** Pushes to GitHub trigger automatic Netlify builds. Do not push without owner authorization.
 
 
 

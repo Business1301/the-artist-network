@@ -110,3 +110,4 @@ The following items block full public commercial launch:
 2. **Owner Details Substitution:** Replacing all placeholder brackets with registered company name, address, and email accounts.
 3. **Netlify Deployment Guard:** Netlify is configured to deploy automatically on push to `master`. Pushes must remain halted until the platform owner reviews and approves the testing version.
 4. **Phase 5 Gate:** Direct booking and client enquiry workflows are not yet implemented. Platform messaging must consistently reflect this until Phase 5 is authorized and built.
+
