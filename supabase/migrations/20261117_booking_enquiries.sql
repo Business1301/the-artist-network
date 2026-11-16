@@ -2,67 +2,32 @@
 -- THE ARTIST NETWORK — Phase 5.1: Booking Enquiry System (Stage 1 Migration)
 -- Migration File: supabase/migrations/20261117_booking_enquiries.sql
 --
--- STATUS: DRAFT SPECIFICATION — PENDING MANUAL OWNER EXECUTION APPROVAL
+-- STATUS: DRAFT SPECIFICATION — AUDITED & CORRECTED FOR POSTGRESQL COMPATIBILITY
 -- DO NOT EXECUTE AUTOMATICALLY. Must be reviewed and manually executed
 -- in the Supabase Dashboard SQL Editor by the platform owner.
 --
--- ARCHITECTURAL INVARIANTS & SECURITY HARDENING:
---
--- 1. NON-BINDING ENQUIRY SEMANTICS:
---    - Status 'interested' replaces any notion of booking acceptance.
---    - Expressing interest conveys artist interest ONLY. It carries:
---      * ZERO legal contract or obligation.
---      * ZERO payment, fee transfer, or escrow processing.
---      * ZERO automatic calendar event creation or date blocking.
---
--- 2. CALENDAR ISOLATION INVARIANT:
---    - Phase 5.1 enquiries DO NOT write to public.artist_calendar_events.
---    - The existing platform_inquiry_id column in calendar events remains
---      an untouched placeholder for future confirmed bookings (Phase 5.2+).
---
--- 3. OPEN VS. TERMINAL ENQUIRY LIFECYCLE:
---    - OPEN statuses (count toward active limits):
---      'submitted', 'seen', 'info_requested', 'clarified'
---    - TERMINAL statuses (concluded; do NOT count toward active limits):
---      'interested', 'declined', 'withdrawn'
---    - Terminal enquiries are preserved for historical record-keeping and
---      never permanently consume active enquiry quotas.
---
--- 4. ATOMIC CONCURRENCY & THREE-TIER SPAM DEFENSE:
---    - Quota 1 (Pair Limit): Maximum 3 OPEN enquiries per (business, artist) pair.
---    - Quota 2 (Platform Limit): Maximum 10 OPEN enquiries platform-wide per business.
---    - Quota 3 (Velocity Limit): Maximum 5 submissions per business in any 1-hour window.
---    - Duplicate Guard: Business cannot have multiple open enquiries for the exact
---      same artist on the exact same event date.
---    - Race conditions eliminated via strictly ordered PostgreSQL transaction-level
---      advisory locks (pg_advisory_xact_lock) inside submit_booking_enquiry.
---      Lock 1: Business Lock ('tan_enq_biz:<uuid>')
---      Lock 2: Pair Lock ('tan_enq_pair:<biz_uuid>:<artist_uuid>')
---
--- 5. TIME ZONE POLICY & RETENTION:
---    - Event dates validated in Indian Standard Time (Asia/Kolkata = UTC+5:30).
---    - Validated inside RPC: p_event_date >= (now() AT TIME ZONE 'Asia/Kolkata')::DATE + 1 day.
---    - NO table-level CHECK (event_date >= CURRENT_DATE). Historical records remain
---      permanently valid across time without schema dump/restore issues.
---
--- 6. STRUCTURED SINGLE-CYCLE CLARIFICATION:
---    - Artist can request clarification via respond_to_booking_enquiry('request_info').
---    - Business can provide exactly one structured response via clarify_booking_enquiry().
---    - Enquiry cannot become stuck: both parties retain clear forward actions.
---
--- 7. AUDIT TRAIL, DATA RETENTION & PRIVACY:
---    - public.booking_enquiry_events is append-only for the duration of the enquiry.
---    - actor_id uses ON DELETE SET NULL to survive individual account closures.
---    - enquiry_id uses ON DELETE CASCADE: if an enquiry is purged (e.g. account erasure
---      under privacy laws/DPDPA), the associated event logs cascade cleanly.
---    - Neither businesses nor artists can manually delete enquiries or event logs.
---
--- 8. ZERO CLIENT DIRECT MUTATIONS & STRICT SEARCH PATH:
---    - Direct INSERT, UPDATE, DELETE on both tables are REVOKED from PUBLIC, anon,
---      and authenticated. Mutations flow strictly through SECURITY DEFINER RPCs.
---    - All RPCs specify SET search_path = '' and qualify all system and user objects
---      (pg_catalog.*, public.*, auth.*).
---    - Default PUBLIC EXECUTE on all RPCs is explicitly REVOKED.
+-- COMPATIBILITY & SECURITY FIXES APPLIED:
+-- 1. NULLIF / COALESCE: Used bare keyword syntax NULLIF(...) and COALESCE(...)
+--    instead of schema-qualified pg_catalog.* (as these are SQL grammatical
+--    constructs, not procedural functions).
+-- 2. BTRIM: Used pg_catalog.btrim(...) for whitespace trimming across all RPCs.
+-- 3. STRICT SEARCH PATH: All 4 RPCs and the trigger maintain SECURITY DEFINER
+--    and SET search_path = '' for maximum security.
+-- 4. EXPLICIT NULL VALIDATION: Upfront checks for NULL artist ID, event date,
+--    and event type before business logic.
+-- 5. ROW LEVEL SECURITY (RLS): Tables use ENABLE ROW LEVEL SECURITY (without
+--    FORCE). Authenticated users have SELECT only; direct table writes are
+--    REVOKED. SECURITY DEFINER RPCs run as postgres to perform internal
+--    mutations without RLS policy violations.
+-- 6. ATOMIC CONCURRENCY & LIMITS:
+--    - Max 3 OPEN enquiries per (business, artist) pair.
+--    - Max 10 OPEN enquiries platform-wide per business.
+--    - Max 5 submissions per business in last 1 hour.
+--    - Duplicate open date guard.
+--    - Concurrency safety guaranteed via strictly ordered transaction-level
+--      advisory locks: (1) tan_enq_biz, then (2) tan_enq_pair.
+-- 7. CALENDAR ISOLATION:
+--    - Zero automatic calendar bookings or date blocks created.
 -- ==============================================================================
 
 BEGIN;
@@ -142,7 +107,7 @@ CREATE INDEX IF NOT EXISTS idx_booking_enquiries_open_biz
   ON public.booking_enquiries (business_id)
   WHERE status IN ('submitted', 'seen', 'info_requested', 'clarified');
 
--- Events chronological index
+-- Chronological events index
 CREATE INDEX IF NOT EXISTS idx_booking_enquiry_events_enquiry 
   ON public.booking_enquiry_events (enquiry_id, created_at ASC);
 
@@ -151,10 +116,7 @@ CREATE INDEX IF NOT EXISTS idx_booking_enquiry_events_enquiry
 -- ============================================================
 
 ALTER TABLE public.booking_enquiries ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.booking_enquiries FORCE ROW LEVEL SECURITY;
-
 ALTER TABLE public.booking_enquiry_events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.booking_enquiry_events FORCE ROW LEVEL SECURITY;
 
 -- Revoke all direct client writes
 REVOKE ALL ON TABLE public.booking_enquiries FROM PUBLIC;
@@ -279,13 +241,26 @@ DECLARE
   v_trimmed_reqs        TEXT;
   v_trimmed_msg         TEXT;
 BEGIN
-  -- 1. Session verification
+  -- 1. Parameter null checks
+  IF p_artist_id IS NULL THEN
+    RAISE EXCEPTION 'Missing Parameter: Target artist ID is required' USING ERRCODE = '23502';
+  END IF;
+
+  IF p_event_date IS NULL THEN
+    RAISE EXCEPTION 'Missing Parameter: Event date is required' USING ERRCODE = '23502';
+  END IF;
+
+  IF p_event_type IS NULL OR pg_catalog.btrim(p_event_type) = '' THEN
+    RAISE EXCEPTION 'Missing Parameter: Event type is required' USING ERRCODE = '23502';
+  END IF;
+
+  -- 2. Session verification
   v_business_id := auth.uid();
   IF v_business_id IS NULL THEN
     RAISE EXCEPTION 'Authentication required to submit a booking enquiry' USING ERRCODE = '42501';
   END IF;
 
-  -- 2. Verify caller role from public.profiles
+  -- 3. Verify caller role from public.profiles
   SELECT role INTO v_business_role 
   FROM public.profiles 
   WHERE id = v_business_id;
@@ -294,12 +269,12 @@ BEGIN
     RAISE EXCEPTION 'Access Denied: Only registered business accounts can submit booking enquiries' USING ERRCODE = '42501';
   END IF;
 
-  -- 3. Prevent self-enquiries
+  -- 4. Prevent self-enquiries
   IF v_business_id = p_artist_id THEN
     RAISE EXCEPTION 'Invalid Target: You cannot submit a booking enquiry to your own account' USING ERRCODE = '23514';
   END IF;
 
-  -- 4. Verify target artist exists and is published (not draft, pending, suspended, or rejected)
+  -- 5. Verify target artist exists and is published (not draft, pending, suspended, or rejected)
   SELECT profile_status INTO v_artist_status 
   FROM public.artist_profiles 
   WHERE id = p_artist_id;
@@ -311,26 +286,30 @@ BEGIN
     RAISE EXCEPTION 'Artist Unavailable: Enquiries can only be submitted to published artists' USING ERRCODE = '23514';
   END IF;
 
-  -- 5. Validate event date (Must be at least tomorrow in Indian Standard Time)
+  -- 6. Validate event date (Must be at least tomorrow in Indian Standard Time)
   v_min_date := (pg_catalog.now() AT TIME ZONE 'Asia/Kolkata')::DATE + INTERVAL '1 day';
   IF p_event_date < v_min_date THEN
     RAISE EXCEPTION 'Invalid Date: Event date must be in the future (at least tomorrow in Indian Standard Time)' USING ERRCODE = '23514';
   END IF;
 
-  -- 6. Validate event type
+  IF p_event_date > (pg_catalog.now() AT TIME ZONE 'Asia/Kolkata')::DATE + INTERVAL '730 days' THEN
+    RAISE EXCEPTION 'Invalid Date: Event date cannot be more than 2 years in advance' USING ERRCODE = '23514';
+  END IF;
+
+  -- 7. Validate event type
   IF p_event_type NOT IN ('wedding', 'corporate', 'restaurant', 'festival', 'private', 'concert', 'other') THEN
     RAISE EXCEPTION 'Invalid Event Type: Must be wedding, corporate, restaurant, festival, private, concert, or other' USING ERRCODE = '23514';
   END IF;
 
-  -- 7. Validate budget if provided
+  -- 8. Validate budget if provided
   IF p_indicative_budget IS NOT NULL AND p_indicative_budget < 0 THEN
     RAISE EXCEPTION 'Invalid Budget: Indicative budget cannot be negative' USING ERRCODE = '23514';
   END IF;
 
-  -- Trim string parameters
-  v_trimmed_location := pg_catalog.nullif(pg_catalog.trim(p_event_location), '');
-  v_trimmed_reqs     := pg_catalog.nullif(pg_catalog.trim(p_requirements), '');
-  v_trimmed_msg      := pg_catalog.nullif(pg_catalog.trim(p_business_message), '');
+  -- 9. Trim string parameters using pg_catalog.btrim and standard NULLIF
+  v_trimmed_location := NULLIF(pg_catalog.btrim(p_event_location), '');
+  v_trimmed_reqs     := NULLIF(pg_catalog.btrim(p_requirements), '');
+  v_trimmed_msg      := NULLIF(pg_catalog.btrim(p_business_message), '');
 
   IF v_trimmed_location IS NOT NULL AND pg_catalog.char_length(v_trimmed_location) > 255 THEN
     RAISE EXCEPTION 'Location text cannot exceed 255 characters' USING ERRCODE = '23514';
@@ -344,13 +323,13 @@ BEGIN
     RAISE EXCEPTION 'Business message cannot exceed 2000 characters' USING ERRCODE = '23514';
   END IF;
 
-  -- 8. Acquire transaction-level advisory locks in STRICT UNIFORM ORDER
+  -- 10. Acquire transaction-level advisory locks in STRICT UNIFORM ORDER
   -- Lock 1: Business Lock (serializes all submissions by this business)
   PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('tan_enq_biz:' || v_business_id::text)::bigint);
   -- Lock 2: Pair Lock (serializes submissions between this business and target artist)
   PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('tan_enq_pair:' || v_business_id::text || ':' || p_artist_id::text)::bigint);
 
-  -- 9. Check 9a: Max 3 OPEN enquiries per (business, artist) pair
+  -- 11. Check 11a: Max 3 OPEN enquiries per (business, artist) pair
   SELECT pg_catalog.count(*) INTO v_active_pair_count
   FROM public.booking_enquiries
   WHERE business_id = v_business_id
@@ -361,7 +340,7 @@ BEGIN
     RAISE EXCEPTION 'Active Limit Reached: You have 3 open enquiries with this artist. Please await a response before sending more.' USING ERRCODE = '23514';
   END IF;
 
-  -- Check 9b: Duplicate open enquiry for exact same event date
+  -- Check 11b: Duplicate open enquiry for exact same event date
   SELECT pg_catalog.count(*) INTO v_duplicate_count
   FROM public.booking_enquiries
   WHERE business_id = v_business_id
@@ -373,7 +352,7 @@ BEGIN
     RAISE EXCEPTION 'Duplicate Enquiry: You already have an open enquiry with this artist for %', p_event_date USING ERRCODE = '23514';
   END IF;
 
-  -- Check 9c: Max 10 OPEN enquiries platform-wide per business
+  -- Check 11c: Max 10 OPEN enquiries platform-wide per business
   SELECT pg_catalog.count(*) INTO v_active_biz_count
   FROM public.booking_enquiries
   WHERE business_id = v_business_id
@@ -383,7 +362,7 @@ BEGIN
     RAISE EXCEPTION 'Platform Limit Reached: You have 10 open enquiries across all artists. Please wait for responses before sending more.' USING ERRCODE = '23514';
   END IF;
 
-  -- Check 9d: Velocity Rate Limit (Max 5 submissions in last 1 hour)
+  -- Check 11d: Velocity Rate Limit (Max 5 submissions in last 1 hour)
   SELECT pg_catalog.count(*) INTO v_hourly_count
   FROM public.booking_enquiries
   WHERE business_id = v_business_id
@@ -393,7 +372,7 @@ BEGIN
     RAISE EXCEPTION 'Rate Limit Exceeded: Maximum 5 enquiries per hour permitted. Please try again later.' USING ERRCODE = '23514';
   END IF;
 
-  -- 10. Insert enquiry record
+  -- 12. Insert enquiry record
   INSERT INTO public.booking_enquiries (
     business_id, artist_id, status, event_date, event_type,
     event_location, requirements, indicative_budget, business_message
@@ -403,7 +382,7 @@ BEGIN
   )
   RETURNING id INTO v_enquiry_id;
 
-  -- 11. Append audit history event
+  -- 13. Append audit history event
   INSERT INTO public.booking_enquiry_events (
     enquiry_id, actor_id, actor_role, action, notes
   ) VALUES (
@@ -448,13 +427,22 @@ DECLARE
   v_current_status TEXT;
   v_trimmed_resp   TEXT;
 BEGIN
-  -- 1. Session check
+  -- 1. Parameter null checks
+  IF p_enquiry_id IS NULL THEN
+    RAISE EXCEPTION 'Missing Parameter: Enquiry ID is required' USING ERRCODE = '23502';
+  END IF;
+
+  IF p_action IS NULL OR pg_catalog.btrim(p_action) = '' THEN
+    RAISE EXCEPTION 'Missing Parameter: Action is required' USING ERRCODE = '23502';
+  END IF;
+
+  -- 2. Session verification
   v_artist_id := auth.uid();
   IF v_artist_id IS NULL THEN
     RAISE EXCEPTION 'Authentication required' USING ERRCODE = '42501';
   END IF;
 
-  -- 2. Verify artist role from public.profiles
+  -- 3. Verify artist role from public.profiles
   SELECT role INTO v_artist_role 
   FROM public.profiles 
   WHERE id = v_artist_id;
@@ -463,7 +451,7 @@ BEGIN
     RAISE EXCEPTION 'Access Denied: Only artist accounts can respond to booking enquiries' USING ERRCODE = '42501';
   END IF;
 
-  -- 3. Lock enquiry row FOR UPDATE (prevents concurrent race conditions)
+  -- 4. Lock enquiry row FOR UPDATE (prevents concurrent race conditions)
   SELECT status INTO v_current_status
   FROM public.booking_enquiries
   WHERE id = p_enquiry_id AND artist_id = v_artist_id
@@ -473,14 +461,14 @@ BEGIN
     RAISE EXCEPTION 'Enquiry Not Found or Access Denied' USING ERRCODE = 'P0002';
   END IF;
 
-  v_trimmed_resp := pg_catalog.nullif(pg_catalog.trim(p_response), '');
+  v_trimmed_resp := NULLIF(pg_catalog.btrim(p_response), '');
   IF v_trimmed_resp IS NOT NULL AND pg_catalog.char_length(v_trimmed_resp) > 2000 THEN
     RAISE EXCEPTION 'Response text cannot exceed 2000 characters' USING ERRCODE = '23514';
   END IF;
 
-  -- 4. State transition rules
+  -- 5. State transition rules
   CASE p_action
-    -- Action 4a: 'seen'
+    -- Action 5a: 'seen'
     WHEN 'seen' THEN
       IF v_current_status NOT IN ('submitted') THEN
         -- Idempotent: If already seen, info_requested, clarified, or terminal, safe no-op
@@ -497,7 +485,7 @@ BEGIN
       VALUES (p_enquiry_id, v_artist_id, 'artist', 'seen', 'Enquiry opened and viewed by artist');
       RETURN;
 
-    -- Action 4b: 'interested' (Non-binding terminal expression of interest)
+    -- Action 5b: 'interested' (Non-binding terminal expression of interest)
     WHEN 'interested' THEN
       IF v_current_status = 'interested' THEN
         RETURN; -- Idempotent
@@ -509,17 +497,17 @@ BEGIN
 
       UPDATE public.booking_enquiries
       SET status = 'interested',
-          artist_response = pg_catalog.coalesce(v_trimmed_resp, artist_response),
+          artist_response = COALESCE(v_trimmed_resp, artist_response),
           responded_at = pg_catalog.now(),
-          seen_at = pg_catalog.coalesce(seen_at, pg_catalog.now()),
+          seen_at = COALESCE(seen_at, pg_catalog.now()),
           updated_at = pg_catalog.now()
       WHERE id = p_enquiry_id AND artist_id = v_artist_id;
 
       INSERT INTO public.booking_enquiry_events (enquiry_id, actor_id, actor_role, action, notes)
-      VALUES (p_enquiry_id, v_artist_id, 'artist', 'interested', pg_catalog.coalesce(v_trimmed_resp, 'Artist expressed non-binding interest'));
+      VALUES (p_enquiry_id, v_artist_id, 'artist', 'interested', COALESCE(v_trimmed_resp, 'Artist expressed non-binding interest'));
       RETURN;
 
-    -- Action 4c: 'decline' (Terminal refusal)
+    -- Action 5c: 'decline' (Terminal refusal)
     WHEN 'decline' THEN
       IF v_current_status = 'declined' THEN
         RETURN; -- Idempotent
@@ -531,17 +519,17 @@ BEGIN
 
       UPDATE public.booking_enquiries
       SET status = 'declined',
-          artist_response = pg_catalog.coalesce(v_trimmed_resp, artist_response),
+          artist_response = COALESCE(v_trimmed_resp, artist_response),
           responded_at = pg_catalog.now(),
-          seen_at = pg_catalog.coalesce(seen_at, pg_catalog.now()),
+          seen_at = COALESCE(seen_at, pg_catalog.now()),
           updated_at = pg_catalog.now()
       WHERE id = p_enquiry_id AND artist_id = v_artist_id;
 
       INSERT INTO public.booking_enquiry_events (enquiry_id, actor_id, actor_role, action, notes)
-      VALUES (p_enquiry_id, v_artist_id, 'artist', 'declined', pg_catalog.coalesce(v_trimmed_resp, 'Artist declined enquiry'));
+      VALUES (p_enquiry_id, v_artist_id, 'artist', 'declined', COALESCE(v_trimmed_resp, 'Artist declined enquiry'));
       RETURN;
 
-    -- Action 4d: 'request_info' (Request structured clarification)
+    -- Action 5d: 'request_info' (Request structured clarification)
     WHEN 'request_info' THEN
       IF v_current_status NOT IN ('submitted', 'seen') THEN
         RAISE EXCEPTION 'Cannot request information: enquiry is currently in status "%"', v_current_status USING ERRCODE = '23514';
@@ -555,7 +543,7 @@ BEGIN
       SET status = 'info_requested',
           artist_response = v_trimmed_resp,
           responded_at = pg_catalog.now(),
-          seen_at = pg_catalog.coalesce(seen_at, pg_catalog.now()),
+          seen_at = COALESCE(seen_at, pg_catalog.now()),
           updated_at = pg_catalog.now()
       WHERE id = p_enquiry_id AND artist_id = v_artist_id;
 
@@ -599,13 +587,18 @@ DECLARE
   v_current_status TEXT;
   v_trimmed_clar   TEXT;
 BEGIN
-  -- 1. Session verification
+  -- 1. Parameter null checks
+  IF p_enquiry_id IS NULL THEN
+    RAISE EXCEPTION 'Missing Parameter: Enquiry ID is required' USING ERRCODE = '23502';
+  END IF;
+
+  -- 2. Session verification
   v_business_id := auth.uid();
   IF v_business_id IS NULL THEN
     RAISE EXCEPTION 'Authentication required' USING ERRCODE = '42501';
   END IF;
 
-  -- 2. Verify business role from public.profiles
+  -- 3. Verify business role from public.profiles
   SELECT role INTO v_business_role 
   FROM public.profiles 
   WHERE id = v_business_id;
@@ -614,8 +607,8 @@ BEGIN
     RAISE EXCEPTION 'Access Denied: Only business accounts can clarify booking enquiries' USING ERRCODE = '42501';
   END IF;
 
-  -- 3. Validate clarification text
-  v_trimmed_clar := pg_catalog.nullif(pg_catalog.trim(p_clarification), '');
+  -- 4. Validate clarification text
+  v_trimmed_clar := NULLIF(pg_catalog.btrim(p_clarification), '');
   IF v_trimmed_clar IS NULL OR pg_catalog.char_length(v_trimmed_clar) < 5 THEN
     RAISE EXCEPTION 'Clarification message must be at least 5 characters long' USING ERRCODE = '23514';
   END IF;
@@ -623,7 +616,7 @@ BEGIN
     RAISE EXCEPTION 'Clarification message cannot exceed 2000 characters' USING ERRCODE = '23514';
   END IF;
 
-  -- 4. Lock enquiry row FOR UPDATE
+  -- 5. Lock enquiry row FOR UPDATE
   SELECT status INTO v_current_status
   FROM public.booking_enquiries
   WHERE id = p_enquiry_id AND business_id = v_business_id
@@ -637,7 +630,7 @@ BEGIN
     RAISE EXCEPTION 'Cannot clarify enquiry: status is currently "%" (must be "info_requested")', v_current_status USING ERRCODE = '23514';
   END IF;
 
-  -- 5. Update status to 'clarified'
+  -- 6. Update status to 'clarified'
   UPDATE public.booking_enquiries
   SET status = 'clarified',
       business_clarification = v_trimmed_clar,
@@ -645,7 +638,7 @@ BEGIN
       updated_at = pg_catalog.now()
   WHERE id = p_enquiry_id AND business_id = v_business_id;
 
-  -- 6. Append audit history event
+  -- 7. Append audit history event
   INSERT INTO public.booking_enquiry_events (
     enquiry_id, actor_id, actor_role, action, notes
   ) VALUES (
@@ -682,13 +675,18 @@ DECLARE
   v_business_role  TEXT;
   v_current_status TEXT;
 BEGIN
-  -- 1. Session verification
+  -- 1. Parameter null checks
+  IF p_enquiry_id IS NULL THEN
+    RAISE EXCEPTION 'Missing Parameter: Enquiry ID is required' USING ERRCODE = '23502';
+  END IF;
+
+  -- 2. Session verification
   v_business_id := auth.uid();
   IF v_business_id IS NULL THEN
     RAISE EXCEPTION 'Authentication required' USING ERRCODE = '42501';
   END IF;
 
-  -- 2. Verify business role from public.profiles
+  -- 3. Verify business role from public.profiles
   SELECT role INTO v_business_role 
   FROM public.profiles 
   WHERE id = v_business_id;
@@ -697,7 +695,7 @@ BEGIN
     RAISE EXCEPTION 'Access Denied: Only business accounts can withdraw booking enquiries' USING ERRCODE = '42501';
   END IF;
 
-  -- 3. Lock enquiry row FOR UPDATE
+  -- 4. Lock enquiry row FOR UPDATE
   SELECT status INTO v_current_status
   FROM public.booking_enquiries
   WHERE id = p_enquiry_id AND business_id = v_business_id
@@ -715,13 +713,13 @@ BEGIN
     RAISE EXCEPTION 'Enquiry cannot be withdrawn: status is already concluded in "%"', v_current_status USING ERRCODE = '23514';
   END IF;
 
-  -- 4. Update status to 'withdrawn'
+  -- 5. Update status to 'withdrawn'
   UPDATE public.booking_enquiries
   SET status = 'withdrawn', 
       updated_at = pg_catalog.now()
   WHERE id = p_enquiry_id AND business_id = v_business_id;
 
-  -- 5. Append audit history event
+  -- 6. Append audit history event
   INSERT INTO public.booking_enquiry_events (
     enquiry_id, actor_id, actor_role, action, notes
   ) VALUES (
@@ -744,8 +742,8 @@ COMMIT;
 --    SELECT table_name FROM information_schema.tables 
 --    WHERE table_schema = 'public' AND table_name IN ('booking_enquiries', 'booking_enquiry_events');
 --
--- 2. Confirm RLS is enabled and forced on both tables:
---    SELECT relname, relrowsecurity, relforcerowsecurity FROM pg_class 
+-- 2. Confirm RLS is enabled:
+--    SELECT relname, relrowsecurity FROM pg_class 
 --    WHERE relname IN ('booking_enquiries', 'booking_enquiry_events');
 --
 -- 3. Confirm all 4 RPCs exist and have search_path = '':
