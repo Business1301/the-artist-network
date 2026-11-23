@@ -21,6 +21,25 @@ Phase 5.1 (Direct Booking Enquiries) has completed comprehensive Stage 6 quality
 | **Automated QA Suite** | `node scratch/verify_phase_5_1_stage_6.mjs` | **PASS (48/48 tests)** | 100% pass rate across all 6 test suites. |
 | **Real Browser Automation** | Chrome DevTools Protocol | **NOT TESTED** | Remote debugging port (9222) not enabled on host. Exact 26-step manual QA checklist provided below. |
 
+### Reconciled Test Inventory (Exact 48 Tests by Suite & Method)
+
+| Suite | Category / Scope | Test IDs | Method | Count | Status |
+|-------|------------------|----------|--------|:-----:|:------:|
+| **Suite 1** | Static Code & UI Consistency | #01–#06 | Static Analysis | 6 | **PASS** |
+| **Suite 2** | Form & Input Validation Edge Cases | #07–#15 | Zod Validation | 9 | **PASS** |
+| **Suite 3** | Role Authorization (RPC & DB Grants) | #16–#19, #21–#23 | Database RPC | 7 | **PASS** |
+| **Suite 3** | Cross-Account & Tenant Isolation | #20, #24, #25 | Supabase RLS | 3 | **PASS** |
+| **Suite 4** | Setup & Baseline Pre-conditions | #26, #27 | Database / Setup | 2 | **PASS** |
+| **Suite 4** | Core Business-to-Artist Journey | #28–#31, #33 | Full Journey RPC | 5 | **PASS** |
+| **Suite 4** | Separate Decline & Withdraw Lifecycles | #35, #36 | Full Journey RPC | 2 | **PASS** |
+| **Suite 4** | State Machine Guard Immutability | #32, #34 | State Machine RPC | 2 | **PASS** |
+| **Suite 4** | Audit Trail Log Verification | #37 | Database Audit | 1 | **PASS** |
+| **Suite 4** | Calendar Zero-Mutation Invariant | #38 | Database Invariant | 1 | **PASS** |
+| **Suite 5** | Live Rate Limiting & Concurrency | #39, #40 | Rate Limit / RPC | 2 | **PASS** |
+| **Suite 6** | Core Platform Route Regressions | #41–#48 | HTTP Network | 8 | **PASS** |
+| **TOTAL** | **Automated QA Suite** | **#01–#48** | **All Automated** | **48** | **PASS** |
+| Manual | Browser UI Verification Protocol | Step 01–26 | Manual Browser | 26 | NOT TESTED |
+
 ---
 
 ## 2. Complete 48-Test Matrix
@@ -187,16 +206,62 @@ During Stage 6 implementation, five specific UX/UI alignment corrections were ap
 
 ---
 
-## 6. Test Data Hygiene
+## 6. Test Data Hygiene & Inventory of Historical Records
 
-- **Open Enquiries:** **0 OPEN test enquiries** remain in the database for the verified test artist.
-- **Terminal Test Records:** A total of 10 historical test enquiries exist for the secondary test business (5 interested, 1 declined, 4 withdrawn). These records are preserved as immutable audit records per platform specifications and do not consume active enquiry quotas.
-- **Genuine User Data:** Zero genuine user accounts or customer records were modified.
+Per project testing constraints, all test records were generated exclusively using dedicated development test accounts (`.test-credentials.local`). Zero genuine customer accounts were created or modified.
+
+### Live Database Enquiry Inventory
+A full live query of `public.booking_enquiries` confirms:
+- **Active Open Enquiries:** **0 OPEN test enquiries** across all accounts (`submitted`, `seen`, `info_requested`, `clarified`). The live active enquiry quota is completely free.
+- **Historical Terminal Records:** **29 total test records** exist in terminal states, preserving immutable audit logs per platform requirements:
+  - **Primary Business (`b4db2908-5454-43e6-81a4-c80ef02d07f5`):** 19 records (6 `interested`, 3 `declined`, 10 `withdrawn`).
+  - **Secondary Business (`d8da5605-cd3b-475d-889f-efb0a7645ed2`):** 10 records (2 `interested`, 1 `declined`, 7 `withdrawn`).
+- **Data Policy:** These records remain untouched in the database. Per non-negotiable security rules, no records will be deleted without explicit, written owner instructions.
 
 ---
 
-## 7. Phase 5.1 Handover Recommendation
+## 7. Isolated Netlify Security Hotfix Deployment Plan
+
+### Context & Git Ancestry
+- **Production Site:** `https://artist-net-v1.netlify.app`
+- **Current Production Git SHA:** `f271d08` (prior to Next.js security advisory GHSA-mfr8-8qww-v76h).
+- **Target Security Patch Commit:** `1128f4d` (upgrades Next.js to `16.4.6` and `eslint-config-next` to `16.4.6`). This commit touches **only** `package.json` and `package-lock.json`.
+- **Local Feature Commits:** Phase 5.1 feature commits (`9359929` through `2b51190`) reside strictly on local `master` and must NOT be released to production until full owner sign-off.
+
+### Exact Safe Git Execution Steps (Requires Explicit Owner Approval Before Pushing)
+```bash
+# 1. Ensure working directory is clean on master
+git status
+
+# 2. Fetch latest remote state without merging
+git fetch origin
+
+# 3. Create and switch to an isolated hotfix branch directly from origin/master (f271d08)
+git checkout -b hotfix/nextjs-16.4.6-security-patch origin/master
+
+# 4. Cherry-pick only the security upgrade commit
+git cherry-pick 1128f4d
+
+# 5. Verify the hotfix locally (build, TypeScript, ESLint, security audit)
+npm ci
+npx tsc --noEmit
+npm run lint
+npm run build
+npm audit --omit=dev
+
+# 6. Deploy to Netlify (ONLY upon explicit owner written authorization):
+# Push the hotfix branch to remote master, triggering Netlify build:
+git push origin hotfix/nextjs-16.4.6-security-patch:master
+
+# 7. Return to local master branch to continue normal development
+git checkout master
+```
+
+---
+
+## 8. Phase 5.1 Handover Recommendation
 
 ### Verdict: **GO — FEATURE COMPLETE (PHASE 5.1)**
 
 All technical, security, architectural, and quality standards established in `AGENTS.md` and `PHASE_5_1_IMPLEMENTATION_PLAN.md` have been fulfilled. The platform is ready for owner review and subsequent manual verification.
+
