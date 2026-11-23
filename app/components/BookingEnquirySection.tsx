@@ -242,7 +242,7 @@ export default function BookingEnquirySection({
                 ✨
               </span>
               <h3 className="text-lg sm:text-xl font-black tracking-tight text-white">
-                Book {artistStageName} for Your Event
+                Enquire About Booking {artistStageName}
               </h3>
             </div>
             <p className="text-xs sm:text-sm text-blue-100 leading-relaxed max-w-xl">

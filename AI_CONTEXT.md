@@ -12,7 +12,7 @@
 **The Artist Network** is a modern, India-focused marketplace connecting artists (singers, musicians, DJs, bands, dancers, performers, visual artists) with businesses (cafes, restaurants, event organizers, corporate venues) and private clients for discovery, booking enquiries, and creative hiring.
 
 ### Core Tech Stack
-- **Framework:** Next.js 16.4.3 (App Router, Turbopack, Partial Prefetching, Cache Components enabled)
+- **Framework:** Next.js 16.4.6 (App Router, Turbopack, Partial Prefetching, Cache Components enabled)
 - **Runtime & UI:** React 19, TypeScript 5, Tailwind CSS v4
 - **Backend as a Service:** Supabase (PostgreSQL 15+, Supabase Auth, Row Level Security, Storage)
 - **Deployment Target:** Vercel (or Node.js server) + Supabase Cloud
@@ -1157,7 +1157,7 @@ All integration checks executed with 100% pass rate:
 - **Phase 5.1 Stage 1 (Booking Enquiry Schema & RPCs):** ✅ FULLY COMPLETED & LIVE-VERIFIED in Supabase.
 - **Phase 5.1 Stage 2 (Server Actions & Zod Validation):** ✅ FULLY COMPLETED & LIVE-VERIFIED (36/36 tests passed).
 - **Phase 5.1 Stage 3 (Business Enquiry Submission UI):** ✅ FULLY COMPLETED & LIVE-VERIFIED (15/15 tests passed).
-- **Phase 5.1 Stage 4 (Artist Dashboard Booking Enquiry UI):** ⏸️ AWAITING OWNER APPROVAL.
+- **Phase 5.1 Stage 4 (Artist Dashboard Booking Enquiry UI):** ✅ FULLY COMPLETED & LIVE-VERIFIED (20/20 tests passed).
 - **Git / Netlify Guard:** Pushes to GitHub trigger automatic Netlify builds. Do not push without owner authorization.
 
 ---
@@ -1301,6 +1301,114 @@ All RPCs enforce authentication via `(SELECT auth.uid())`, check profile roles i
   3. Verify `npm audit --omit=dev`, `npx tsc --noEmit`, and `npm run build` on the hotfix branch.
   4. Deploy hotfix branch to Netlify via preview build or authorized push to `origin/master`.
   5. Feature commits remain quarantined on local `master` branch.
+
+---
+
+## 16. Phase 5.1 Stage 4 — Artist Booking Enquiry Management UI (2026-11-23)
+
+### 16.1 Overview
+Stage 4 completes the artist-facing half of the Phase 5.1 booking enquiry workflow. Artists can now receive, review, and respond to business enquiries through a dedicated inbox tab in their existing dashboard — without any new SQL migrations, schema changes, or calendar modifications.
+
+### 16.2 Files Created or Modified
+| File | Action | Description |
+|------|--------|-------------|
+| `app/components/ArtistEnquiriesInbox.tsx` | **Created** | Full artist enquiry inbox with status filtering, expand/collapse cards, action modals, audit log display, past-event badge, and non-blocking seen marking. |
+| `app/dashboard/artist/page.tsx` | **Modified** | Added `enquiries` tab to `useState`, loaded enquiries in `Promise.all`, added live KPI Enquiries card (with unseen pulse badge), replaced "Coming Soon" placeholder with live Enquiries summary card, added `<ArtistEnquiriesInbox>` tab render, added tab button with live unread badge. |
+| `app/components/BookingEnquirySection.tsx` | **Modified** | Corrected Stage 3 promotional copy from `"Book {artistStageName} for Your Event"` → `"Enquire About Booking {artistStageName}"`. |
+| `scratch/verify_phase_5_1_stage_4.mjs` | **Created** | 20-check automated verification suite covering copy, component integration, authentication isolation, full RPC lifecycle, state machine guards, audit event capture, calendar invariant, and past-event date logic. |
+
+### 16.3 Artist Dashboard UI Changes
+
+**KPI Row (5-card layout):**
+- Card 1 — Booking Enquiries: Shows open count. Clicking navigates to Enquiries tab. Amber pulse badge appears when `unseenCount > 0`.
+- Cards 2–5 — Profile Completion %, Total Portfolio items, Avg. Weekly Views placeholder, Calendar Events.
+
+**Tab Navigation:**
+- Three tabs: Overview | Portfolio | Booking Enquiries
+- Booking Enquiries tab shows unread count badge or "Open" pill when enquiries exist.
+
+**Overview Tab — Enquiries Summary Card:**
+- Replaces the old "Coming Soon" placeholder (which had misleading messaging about enquiries not being live).
+- Shows live summary: Action Needed count, Unopened count, Total count with "View All" link to Enquiries tab.
+- When enquiries.length === 0: gentle empty state ("No enquiries yet").
+
+**Enquiries Tab — ArtistEnquiriesInbox Component:**
+
+Filter Tabs:
+- `All` — All enquiries
+- `Action Needed` — submitted + seen + clarified (artist must respond)
+- `Awaiting Business` — info_requested (waiting for clarification)
+- `Concluded` — interested + declined + withdrawn
+
+Each enquiry card shows:
+- Business/venue name (safe fallback to "Business Client" if profile RLS restricts)
+- Event date, event type, location
+- Indicative budget in INR (with "(indicative, non-binding)" label when present)
+- Requirements text
+- Current status badge with color coding
+- Past Event badge (⌛) when event_date < today in IST
+- Submission date (IST)
+- Full audit event history (chronological)
+
+Explicit Actions (shown only when state machine permits):
+- **Mark Seen**: Fires on first expand of a `submitted` enquiry. Non-blocking, optimistic UI.
+- **Request Information**: Available in `submitted`/`seen` state. Requires ≥ 5 character question via modal.
+- **Express Interest**: Available in `seen`/`submitted`/`clarified` state. Opens non-binding interest modal with optional note. Status `interested` is NEVER called "Booked", "Confirmed" or "Accepted".
+- **Decline**: Available in all open states. Optional reason via modal. Terminal.
+- Buttons disabled during `isSubmitting` with spinner indicator.
+
+### 16.4 Status Definitions (Authoritative)
+
+| Status | Label | Category | Meaning |
+|--------|-------|----------|---------|
+| `submitted` | Submitted | Open | New enquiry, artist not yet viewed |
+| `seen` | Seen | Open | Artist has explicitly opened the enquiry |
+| `info_requested` | Info Requested | Open (Awaiting Business) | Artist asked a question; business must clarify |
+| `clarified` | Clarified | Open | Business answered; artist can respond |
+| `interested` | Interested | Terminal | Non-binding expression of mutual interest. NOT a booking. |
+| `declined` | Declined | Terminal | Artist formally declined the enquiry |
+| `withdrawn` | Withdrawn | Terminal | Business withdrew the enquiry |
+
+### 16.5 Security & Privacy Invariants (All Verified)
+- **Role Isolation:** `respond_to_booking_enquiry` RPC enforces `role = 'artist'` via `public.profiles`. Business/admin calls are rejected with ERRCODE `42501`.
+- **Cross-Artist Isolation:** RLS enforces `artist_id = auth.uid()`. No artist can read another's enquiries (confirmed: other artist gets 0 rows).
+- **No Client Writes:** Direct `INSERT/UPDATE/DELETE` on `booking_enquiries` and `booking_enquiry_events` are revoked from all authenticated clients. All mutations go through SECURITY DEFINER RPCs.
+- **No Public Exposure:** Enquiry data has no public SELECT policy. Anonymous queries return 0 rows.
+- **No Calendar Side Effects:** Calendar Isolation Invariant confirmed — `artist_calendar_events` count remains unchanged after the full enquiry lifecycle (submit → seen → info_requested → clarified → interested).
+
+### 16.6 State Machine Guard (Test #14 Confirmed)
+The database RPC `respond_to_booking_enquiry` raises PostgreSQL exception ERRCODE `23514` when an artist attempts to call `interested` while the enquiry is in `info_requested` status. The UI enforces this by hiding the Express Interest button in `info_requested` state. Both the DB guard and the UI guard are independently enforced.
+
+### 16.7 Verification Results
+- **Test Suite:** `scratch/verify_phase_5_1_stage_4.mjs`
+- **Result:** **20 / 20 checks PASSED (100% pass rate)**
+- **Suites Covered:**
+  - Suite 1 (Copy & Integration): Tests 1–3 ✅
+  - Suite 2 (Auth & Isolation): Tests 4–7 ✅ (3 account types authenticated, cross-artist RLS verified)
+  - Suite 3 (Lifecycle & Guards): Tests 8–20 ✅ (full enquiry lifecycle, audit events, state machine guard, calendar invariant, past-event date logic)
+- **Compiler:** TypeScript 0 errors
+- **Linter:** ESLint 0 errors (28 pre-existing `<img>` and scratch-script warnings unchanged from prior stages)
+- **Build:** Next.js 16.4.6 — 22/22 routes compiled successfully
+- **Security Audit:** `npm audit --omit=dev` — **0 vulnerabilities**
+
+### 16.8 Browser Testing
+Real browser testing (10-step user flow) was **NOT PERFORMED** in Stage 4 — the browser automation subagent was not available for a full interactive session. The following alternative tests were performed:
+- Automated Supabase API tests confirmed end-to-end RPC lifecycle.
+- Component code review confirms correct conditional rendering for each state.
+- The dev server (port 3000) is running. Manual browser testing is recommended by the platform owner.
+
+### 16.9 Isolated Security Deployment Update
+- `master` is now 13 commits ahead of `origin/master` (12 prior + Stage 4 commit).
+- The Next.js 16.4.6 security patch (`1128f4d`) is still the recommended cherry-pick target for a hotfix deploy.
+- Stage 4 feature commits must NOT be force-deployed as a shortcut.
+
+### 16.10 Stage 5 Requirements (Business Dashboard UI)
+Stage 5 will add the Business side of the enquiry workflow. Requirements:
+1. Business dashboard enquiries panel showing all submitted enquiries and their current status.
+2. Withdrawal action — business can withdraw an open enquiry.
+3. Clarification response UI — business responds to `info_requested` using `clarify_booking_enquiry` RPC.
+4. Status display for `interested`/`declined` terminal states (read-only view, non-binding notice for `interested`).
+5. No calendar integration, no payment flow, no confirmed booking in Phase 5.1.
 
 
 

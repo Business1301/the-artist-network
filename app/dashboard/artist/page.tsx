@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { getArtistProfile, ArtistProfileData, PortfolioItemData } from "@/app/actions/artist";
+import { getArtistEnquiriesAction } from "@/app/actions/enquiries";
+import { BookingEnquiryWithDetails } from "@/lib/enquiries/types";
+import ArtistEnquiriesInbox from "@/app/components/ArtistEnquiriesInbox";
 import { createClient } from "@/lib/supabase/client";
 
 // Completeness field definitions — each has a key, label, weight, and check function
@@ -28,13 +31,14 @@ const COMPLETENESS_FIELDS: CompletenessField[] = [
 
 export default function ArtistDashboardPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"overview" | "portfolio">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "portfolio" | "enquiries">("overview");
 
   // Real Database State
   const [isLoading, setIsLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [profile, setProfile] = useState<ArtistProfileData | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioItemData[]>([]);
+  const [enquiries, setEnquiries] = useState<BookingEnquiryWithDetails[]>([]);
 
   useEffect(() => {
     async function loadData() {
@@ -52,11 +56,19 @@ export default function ArtistDashboardPage() {
 
       setUserEmail(user.email || null);
 
-      const res = await getArtistProfile();
+      const [res, enqRes] = await Promise.all([
+        getArtistProfile(),
+        getArtistEnquiriesAction({ status: "all", limit: 50 }),
+      ]);
+
       if (res.success) {
         setProfile(res.profile || null);
         setPortfolio(res.portfolio || []);
       }
+      if (enqRes.success && enqRes.data) {
+        setEnquiries(enqRes.data);
+      }
+
       setIsLoading(false);
     }
 
@@ -81,6 +93,12 @@ export default function ArtistDashboardPage() {
   };
 
   const { score: completeness, missing: missingFields } = getCompleteness();
+
+  // Derived enquiry counts from real database records
+  const unseenCount = enquiries.filter((e) => e.status === "submitted").length;
+  const openEnquiriesCount = enquiries.filter((e) =>
+    ["submitted", "seen", "info_requested", "clarified"].includes(e.status)
+  ).length;
 
   if (isLoading) {
     return (
@@ -298,8 +316,30 @@ export default function ArtistDashboardPage() {
             </>
           )}
 
-        {/* KPI Cards — Only real data */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {/* KPI Cards — Only real database data */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4 mb-8">
+          {/* 1. Enquiries Card */}
+          <div
+            onClick={() => setActiveTab("enquiries")}
+            className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm hover:border-purple-300 hover:shadow-md transition-all cursor-pointer group"
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-medium text-gray-500">Booking Enquiries</span>
+              {unseenCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-500 text-white animate-pulse">
+                  {unseenCount} new
+                </span>
+              )}
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl sm:text-3xl font-extrabold text-gray-900 group-hover:text-purple-600 transition-colors">
+                {openEnquiriesCount}
+              </span>
+              <span className="text-[11px] font-semibold text-purple-600">active open</span>
+            </div>
+          </div>
+
+          {/* 2. Portfolio Items */}
           <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
             <span className="text-xs font-medium text-gray-500 block mb-1">Portfolio Items</span>
             <div className="flex items-baseline gap-2">
@@ -310,8 +350,9 @@ export default function ArtistDashboardPage() {
             </div>
           </div>
 
+          {/* 3. Indicative Fee */}
           <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-            <span className="text-xs font-medium text-gray-500 block mb-1">Indicative Fee</span>
+            <span className="text-xs font-medium text-gray-500 block mb-1">Starting Rate</span>
             <div className="flex items-baseline gap-2">
               <span className="text-xl sm:text-2xl font-extrabold text-gray-900">
                 {profile?.starting_price ? `₹${profile.starting_price.toLocaleString("en-IN")}` : "Not Set"}
@@ -319,6 +360,7 @@ export default function ArtistDashboardPage() {
             </div>
           </div>
 
+          {/* 4. Profile Status */}
           <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
             <span className="text-xs font-medium text-gray-500 block mb-1">Profile Status</span>
             <div className="flex items-baseline gap-2">
@@ -328,7 +370,8 @@ export default function ArtistDashboardPage() {
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+          {/* 5. Profile Completion */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm col-span-2 lg:col-span-1">
             <span className="text-xs font-medium text-gray-500 block mb-1">Profile Completion</span>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl sm:text-3xl font-extrabold text-gray-900">{completeness}%</span>
@@ -338,10 +381,10 @@ export default function ArtistDashboardPage() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center gap-2 border-b border-gray-200 pb-3 mb-6">
+        <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 pb-3 mb-6">
           <button
             onClick={() => setActiveTab("overview")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeTab === "overview"
                 ? "bg-purple-600 text-white shadow-sm"
                 : "bg-white text-gray-600 hover:bg-gray-100"
@@ -350,8 +393,27 @@ export default function ArtistDashboardPage() {
             Overview &amp; Actions
           </button>
           <button
+            onClick={() => setActiveTab("enquiries")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === "enquiries"
+                ? "bg-purple-600 text-white shadow-sm"
+                : "bg-white text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            <span>Booking Enquiries</span>
+            {unseenCount > 0 ? (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-500 text-white animate-pulse">
+                {unseenCount}
+              </span>
+            ) : openEnquiriesCount > 0 ? (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-700">
+                {openEnquiriesCount}
+              </span>
+            ) : null}
+          </button>
+          <button
             onClick={() => setActiveTab("portfolio")}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeTab === "portfolio"
                 ? "bg-purple-600 text-white shadow-sm"
                 : "bg-white text-gray-600 hover:bg-gray-100"
@@ -444,18 +506,73 @@ export default function ArtistDashboardPage() {
               )}
             </div>
 
-            {/* Booking Enquiries — Coming Soon Notice */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-lg">💬</span>
-                <h3 className="text-sm font-bold text-gray-900">Booking Enquiries</h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 uppercase tracking-wider">
-                  Coming Soon
-                </span>
+            {/* Booking Enquiries — Live Management */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:border-purple-200 transition-all">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-lg">
+                    💬
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-gray-900">Booking Enquiries</h3>
+                      {unseenCount > 0 ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white animate-pulse">
+                          {unseenCount} New
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Direct event enquiries submitted by verified businesses
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("enquiries")}
+                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-colors inline-flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+                >
+                  <span>Open Inbox</span>
+                  {enquiries.length > 0 && <span>({enquiries.length})</span>}
+                  <span>→</span>
+                </button>
               </div>
-              <p className="text-xs text-gray-500 leading-relaxed">
-                Direct booking enquiries from venues, event organizers, and clients will appear here once the messaging and booking system is live. You will receive notifications for new requests and be able to respond, negotiate, and manage confirmations from this dashboard.
-              </p>
+
+              {enquiries.length === 0 ? (
+                <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 text-xs text-gray-500">
+                  <p>
+                    No enquiries received yet. When restaurants or venues discover your profile and submit a booking enquiry, it will appear here for you to review and respond.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl bg-gray-50 border border-gray-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-4 text-gray-600">
+                    <span>
+                      <strong className="text-gray-900 font-bold">{openEnquiriesCount}</strong> Action Needed / Open
+                    </span>
+                    <span className="text-gray-300">•</span>
+                    <span>
+                      <strong className="text-gray-900 font-bold">{unseenCount}</strong> Unopened
+                    </span>
+                    <span className="text-gray-300">•</span>
+                    <span>
+                      <strong className="text-gray-900 font-bold">{enquiries.length}</strong> Total
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("enquiries")}
+                    className="text-purple-600 hover:text-purple-800 font-bold text-xs"
+                  >
+                    View All Enquiries →
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Gig Schedule & Calendar — Live */}
@@ -549,6 +666,11 @@ export default function ArtistDashboardPage() {
               </div>
             )}
           </div>
+        )}
+
+        {/* TAB 3: Booking Enquiries Inbox */}
+        {activeTab === "enquiries" && (
+          <ArtistEnquiriesInbox initialEnquiries={enquiries} />
         )}
       </div>
     </main>
