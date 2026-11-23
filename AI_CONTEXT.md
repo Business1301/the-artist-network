@@ -1158,6 +1158,7 @@ All integration checks executed with 100% pass rate:
 - **Phase 5.1 Stage 2 (Server Actions & Zod Validation):** ✅ FULLY COMPLETED & LIVE-VERIFIED (36/36 tests passed).
 - **Phase 5.1 Stage 3 (Business Enquiry Submission UI):** ✅ FULLY COMPLETED & LIVE-VERIFIED (15/15 tests passed).
 - **Phase 5.1 Stage 4 (Artist Dashboard Booking Enquiry UI):** ✅ FULLY COMPLETED & LIVE-VERIFIED (20/20 tests passed).
+- **Phase 5.1 Stage 5 (Business Enquiry Tracking & Clarification UI):** ✅ FULLY COMPLETED & LIVE-VERIFIED (21/21 tests passed).
 - **Git / Netlify Guard:** Pushes to GitHub trigger automatic Netlify builds. Do not push without owner authorization.
 
 ---
@@ -1402,13 +1403,79 @@ Real browser testing (10-step user flow) was **NOT PERFORMED** in Stage 4 — th
 - The Next.js 16.4.6 security patch (`1128f4d`) is still the recommended cherry-pick target for a hotfix deploy.
 - Stage 4 feature commits must NOT be force-deployed as a shortcut.
 
-### 16.10 Stage 5 Requirements (Business Dashboard UI)
-Stage 5 will add the Business side of the enquiry workflow. Requirements:
-1. Business dashboard enquiries panel showing all submitted enquiries and their current status.
-2. Withdrawal action — business can withdraw an open enquiry.
-3. Clarification response UI — business responds to `info_requested` using `clarify_booking_enquiry` RPC.
-4. Status display for `interested`/`declined` terminal states (read-only view, non-binding notice for `interested`).
-5. No calendar integration, no payment flow, no confirmed booking in Phase 5.1.
+### 16.10 Stage 5 Transition
+Stage 5 has been completed locally. See Section 17 below for details.
+
+---
+
+## 17. Phase 5.1 Stage 5 — Business Enquiry Tracking & Clarification UI (2026-11-24)
+
+### 17.1 Overview
+Stage 5 delivers the business-facing enquiry management interface at `/dashboard/restaurant`. Businesses can now view their real booking enquiries sent to artists, filter them by status, respond to artist requests for clarification (within the single-cycle state machine), and withdraw open enquiries before conclusion. All mock data has been purged from the business dashboard.
+
+### 17.2 Files Created or Modified
+| File | Action | Description |
+|------|--------|-------------|
+| `app/components/BusinessEnquiriesPanel.tsx` | **Created** | Comprehensive business enquiry management panel with 5 status filter tabs, live counts, expand/collapse cards, artist profile links, event specifications, budget in INR, non-binding notices, chronological audit event history, clarification modal (5–2000 chars), and withdrawal confirmation modal. |
+| `app/dashboard/restaurant/page.tsx` | **Modified** | Replaced mock data (`mockSentEnquiries`) with live Supabase data via `getBusinessEnquiriesAction`. Added real KPI cards (Sent Enquiries, Your Response Needed, Artist Interested), action-needed alert banner, default "enquiries" tab, and retained demo lineup/shortlist tabs. |
+| `app/components/ArtistEnquiriesInbox.tsx` | **Modified** | Fixed Stage 4 filter tab label ("Concluded / Terminal" → "Concluded") to clearly distinguish open from terminal states. Fixed ESLint `react-hooks/set-state-in-effect` error and removed unused `Link` import. |
+| `scratch/verify_phase_5_1_stage_5.mjs` | **Created** | Automated test suite validating static components, cross-business RLS isolation, artist RPC restrictions, clarification lifecycle, withdrawal lifecycle, terminal state protection, and calendar invariant (21/21 passed). |
+
+### 17.3 Business Dashboard UI & State Machine
+1. **Filter Tabs:**
+   - **All Enquiries:** Complete chronological list with count badge.
+   - **Awaiting Artist:** Enquiries in `submitted`, `seen`, or `clarified` states awaiting artist action.
+   - **Your Response Needed:** Enquiries in `info_requested` state where the artist asked a question. Displays prominent amber alert badge.
+   - **Artist Interested:** Non-binding expressions of interest from artists.
+   - **Concluded:** Terminal enquiries (`interested`, `declined`, `withdrawn`).
+2. **Clarification Workflow:**
+   - Displayed when an enquiry is in `info_requested` status.
+   - Modal shows the artist's specific inquiry.
+   - Reply form enforces 5–2,000 character length (Zod + client validation).
+   - Calls `clarifyEnquiryAction` → executes `clarify_booking_enquiry` RPC.
+   - Transitions status to `clarified` (open state).
+   - Single-cycle enforcement: Further clarifications are blocked by RPC.
+   - Clear explanatory text: "The artist will review your clarification before expressing interest or declining."
+3. **Withdrawal Workflow:**
+   - Available on any open enquiry (`submitted`, `seen`, `info_requested`, `clarified`).
+   - Confirmation dialog clearly explains consequences: "This action cannot be undone. The artist will be notified that this enquiry is no longer active."
+   - Calls `withdrawEnquiryAction` → executes `withdraw_booking_enquiry` RPC.
+   - Transitions status to `withdrawn` (terminal state).
+   - Blocked on terminal states (`interested`, `declined`).
+
+### 17.4 Status Display Semantics
+| Status | Business-Facing Label | Category | Notes |
+|--------|----------------------|----------|-------|
+| `submitted` | Submitted | Open | Initial state upon sending enquiry. |
+| `seen` | Viewed by Artist | Open | Artist has viewed enquiry details. |
+| `info_requested` | Your Response Needed | Open | Artist asked for additional information. |
+| `clarified` | Clarification Sent | Open | Business responded to artist inquiry. |
+| `interested` | Artist Interested (Non-binding) | Terminal | Non-binding. Not a confirmed booking or payment. |
+| `declined` | Declined | Terminal | Artist politely declined. |
+| `withdrawn` | Withdrawn | Terminal | Business cancelled the enquiry. |
+
+### 17.5 Security & Privacy Controls Verified
+- **Session-Based Identity:** Business identity is resolved strictly via `supabase.auth.getUser()` and `public.profiles.role = 'business'`. User-supplied IDs are rejected.
+- **Cross-Business RLS Isolation:** Verified that Business B cannot view Business A's enquiries (`0 rows` returned when querying another business's ID).
+- **RPC Role Enforcement:** Verified that Artist accounts cannot call `clarify_booking_enquiry` or `withdraw_booking_enquiry` (fails with `Access Denied` / permission error).
+- **Terminal State Protection:** Verified that enquiries in `interested` terminal state cannot be withdrawn via `withdraw_booking_enquiry`.
+- **Zero Calendar Mutation:** Invariant verified across all enquiry creation, clarification, and withdrawal operations (calendar event count unchanged).
+
+### 17.6 Verification Results
+- **TypeScript:** `npx tsc --noEmit` passed with 0 errors.
+- **ESLint:** `npm run lint` passed with 0 errors (30 pre-existing warnings in images and scratch files).
+- **Production Build:** `npm run build` succeeded (22/22 routes rendered).
+- **Security Audit:** `npm audit --omit=dev` reported 0 vulnerabilities.
+- **Automated Verification Suite (`scratch/verify_phase_5_1_stage_5.mjs`):** 21/21 tests passed.
+- **Browser Interaction Testing:** NOT TESTED (Chrome remote debugging port 9222 not enabled in the environment).
+
+### 17.7 Remaining Stage 6 Requirements
+Stage 6 (Final End-to-End Integration, Edge Cases & Verification) will cover:
+1. End-to-end multi-role flow test (Business sends enquiry → Artist reviews & requests info → Business clarifies → Artist expresses interest).
+2. Rate-limiting edge-case testing (max 3 open enquiries per pair, submission velocity limits).
+3. In-app navigation & notification badge consistency across desktop and mobile.
+4. Final Stage 5/6 regression checks across existing Phase 1–4 features.
+
 
 
 

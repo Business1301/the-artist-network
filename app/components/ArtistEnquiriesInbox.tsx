@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useId } from "react";
-import Link from "next/link";
 import {
   BookingEnquiryWithDetails,
   BookingEnquiryStatus,
@@ -76,10 +75,26 @@ export default function ArtistEnquiriesInbox({
   }, []);
 
   useEffect(() => {
+    let ignore = false;
     if (!initialEnquiries) {
-      loadEnquiries();
+      getArtistEnquiriesAction({ status: "all", limit: 50 }).then((res) => {
+        if (!ignore) {
+          if (res.success && res.data) {
+            setEnquiries(res.data);
+          } else if (res.error) {
+            setFeedbackNotice({
+              type: "error",
+              message: res.error || "Failed to load enquiries.",
+            });
+          }
+          setIsLoading(false);
+        }
+      });
     }
-  }, [initialEnquiries, loadEnquiries]);
+    return () => {
+      ignore = true;
+    };
+  }, [initialEnquiries]);
 
   // Handle explicit expand & mark seen
   const handleToggleExpand = async (enquiry: BookingEnquiryWithDetails) => {
@@ -345,7 +360,7 @@ export default function ArtistEnquiriesInbox({
                 : "bg-gray-50 text-gray-700 hover:bg-gray-100"
             }`}
           >
-            <span>Concluded / Terminal</span>
+            <span>Concluded</span>
             <span className="opacity-80">({concludedCount})</span>
           </button>
         </div>
