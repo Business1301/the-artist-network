@@ -1502,10 +1502,37 @@ Stage 6 represents the final validation gate for Phase 5.1 (Direct Booking Enqui
 - **Security Audit:** `npm audit --omit=dev` → **0 vulnerabilities**.
 
 ### 18.4 Phase 5.1 Architecture Handover Status
-- **Current Branch:** `master` (15 commits ahead of `origin/master`).
+- **Current Branch:** `master` (16 commits ahead of `origin/master`).
 - **Phase Status:** **PHASE 5.1 COMPLETED & LOCAL LOCKED (GO FOR REVIEW)**.
 - **Strict Boundary Reminder:** Phase 5.2 (formal contracts, binding confirmations, and payment gateways) must NOT be started without explicit written platform owner sign-off.
-- **Netlify Status:** Production deployment remains isolated on `f271d08`. The Next.js 16.4.6 security patch (`1128f4d`) is prepared for an isolated hotfix push if desired by the owner.
+- **Netlify Status:** Production deployment on Netlify is currently at commit `f271d08`. An isolated hotfix branch `hotfix/nextjs-16.4.6-patch` has been prepared and verified.
+
+---
+
+## 19. Netlify Security Hotfix Preparation (Next.js 16.4.6) (2026-11-24)
+
+### 19.1 Objective & Strategy
+A security vulnerability in Next.js (GHSA-mfr8-8qww-v76h) required patching on the public Netlify testing site (`https://artist-net-v1.netlify.app`) without deploying the 16 local feature and documentation commits of Phase 5.1.
+
+### 19.2 Isolated Hotfix Branch
+- **Branch:** `hotfix/nextjs-16.4.6-patch`
+- **Base:** `f271d08a97b96f5e179aea3b47f0e19d0d5c9fa5` (verified `origin/master` baseline)
+- **Hotfix Commit:** `7f1810ef5370f05871407cf84ccfb6876d86166c` (cherry-picked from `1128f4d`)
+- **Diff:** Strictly `package.json` (+2/-2) and `package-lock.json` (+48/-48) upgrading `next` and `eslint-config-next` from `16.4.3` to `16.4.6`.
+- **Zero Leakage:** 0 feature files, 0 database RPCs, 0 legal pages, and 0 secrets included.
+
+### 19.3 Verification on Hotfix Branch
+- `npx tsc --noEmit`: 0 errors.
+- `npm run lint`: 0 errors.
+- `npm run build`: 17/17 baseline production routes rendered cleanly in 2.4s.
+- `npm audit --omit=dev`: `found 0 vulnerabilities`.
+
+### 19.4 Deployment & Reconciliation Protocol
+1. **Push Command (Awaiting Owner Authorization):**
+   `git push origin hotfix/nextjs-16.4.6-patch:master` (clean fast-forward push: 1 commit ahead of `origin/master`).
+2. **Netlify Automated CI/CD:** Netlify builds and deploys Next.js 16.4.6 with existing baseline routes.
+3. **Local Reconciliation:** Run `git checkout master`, `git fetch origin`, and `git rebase origin/master` to sync remote state without any force-push or merge conflicts.
+
 
 
 
