@@ -169,14 +169,16 @@ export default function BusinessEnquiriesPanel({
   const interestedCount = enquiries.filter(
     (e) => e.status === "interested"
   ).length;
-  const concludedCount = enquiries.filter((e) => isTerminalStatus(e.status)).length;
+  const concludedCount = enquiries.filter(
+    (e) => e.status === "declined" || e.status === "withdrawn"
+  ).length;
 
   // Filtered list
   const filtered = enquiries.filter((e) => {
     if (activeTab === "awaiting_artist") return ["submitted", "seen", "clarified"].includes(e.status);
     if (activeTab === "action_needed") return e.status === "info_requested";
     if (activeTab === "interested") return e.status === "interested";
-    if (activeTab === "concluded") return isTerminalStatus(e.status);
+    if (activeTab === "concluded") return e.status === "declined" || e.status === "withdrawn";
     return true;
   });
 
@@ -229,7 +231,7 @@ export default function BusinessEnquiriesPanel({
     awaiting_artist: "No enquiries are currently awaiting an artist response.",
     action_needed: "No enquiries require your response right now.",
     interested: "No artists have expressed interest yet.",
-    concluded: "No concluded enquiries.",
+    concluded: "No declined or withdrawn enquiries.",
   };
 
   return (
@@ -279,7 +281,7 @@ export default function BusinessEnquiriesPanel({
               { id: "awaiting_artist", label: "Awaiting Artist", count: awaitingArtistCount },
               { id: "action_needed", label: "Your Response Needed", count: actionNeededCount, urgent: true },
               { id: "interested", label: "Artist Interested", count: interestedCount },
-              { id: "concluded", label: "Concluded", count: concludedCount },
+              { id: "concluded", label: "Declined / Withdrawn", count: concludedCount },
             ] as { id: FilterTab; label: string; count: number; urgent?: boolean }[]
           ).map((tab) => (
             <button
@@ -713,9 +715,7 @@ export default function BusinessEnquiriesPanel({
               for the event on <strong>{withdrawModal.event_date}</strong>.
             </p>
             <p className="text-xs text-gray-500 mb-4 p-3 bg-gray-50 rounded-xl border border-gray-100">
-              Withdrawing is permanent. The enquiry will be marked as <strong>Withdrawn</strong> and
-              the artist will no longer be able to respond. Your enquiry history will be preserved.
-              You can send a new enquiry if needed.
+              Withdrawing is permanent. The enquiry will be marked as <strong>Withdrawn</strong> in your dashboard and the artist&apos;s dashboard. No email or SMS notification is sent; the artist will see the updated status in their enquiry inbox. The artist will no longer be able to respond. Your enquiry history will be preserved.
             </p>
 
             {withdrawError && (

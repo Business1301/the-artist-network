@@ -395,7 +395,7 @@ export default function ArtistEnquiriesInbox({
           </h3>
           <p className="text-xs sm:text-sm text-gray-500 max-w-md mx-auto leading-relaxed">
             {activeTab === "action_needed"
-              ? "You have reviewed all incoming enquiries. When venues submit new requests, they will appear here."
+              ? "You have reviewed all incoming enquiries. When venues submit new requests or provide requested clarifications, they will appear here in Action Needed."
               : "When businesses discover your public profile and send event requirements, their enquiries will arrive in this inbox."}
           </p>
         </div>
@@ -565,6 +565,18 @@ export default function ArtistEnquiriesInbox({
                             <p>{enquiry.business_clarification}</p>
                           </div>
                         )}
+                      </div>
+                    )}
+
+                    {/* Actionable Banner for Clarified Enquiries */}
+                    {enquiry.status === "clarified" && (
+                      <div className="p-3 rounded-xl bg-purple-50 border border-purple-200 text-purple-900 text-xs leading-relaxed">
+                        <span className="font-bold block mb-0.5">
+                          ⚡ Action Needed: Client Clarification Received
+                        </span>
+                        <p>
+                          The client has provided the clarification requested. This enquiry is active and awaiting your decision. Please review and express interest or decline below.
+                        </p>
                       </div>
                     )}
 

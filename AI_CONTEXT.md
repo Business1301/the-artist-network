@@ -1159,6 +1159,7 @@ All integration checks executed with 100% pass rate:
 - **Phase 5.1 Stage 3 (Business Enquiry Submission UI):** ✅ FULLY COMPLETED & LIVE-VERIFIED (15/15 tests passed).
 - **Phase 5.1 Stage 4 (Artist Dashboard Booking Enquiry UI):** ✅ FULLY COMPLETED & LIVE-VERIFIED (20/20 tests passed).
 - **Phase 5.1 Stage 5 (Business Enquiry Tracking & Clarification UI):** ✅ FULLY COMPLETED & LIVE-VERIFIED (21/21 tests passed).
+- **Phase 5.1 Stage 6 (Complete End-to-End Testing & QA):** ✅ FULLY COMPLETED (48/48 automated QA tests passed). PHASE 5.1 FEATURE COMPLETE.
 - **Git / Netlify Guard:** Pushes to GitHub trigger automatic Netlify builds. Do not push without owner authorization.
 
 ---
@@ -1469,12 +1470,43 @@ Stage 5 delivers the business-facing enquiry management interface at `/dashboard
 - **Automated Verification Suite (`scratch/verify_phase_5_1_stage_5.mjs`):** 21/21 tests passed.
 - **Browser Interaction Testing:** NOT TESTED (Chrome remote debugging port 9222 not enabled in the environment).
 
-### 17.7 Remaining Stage 6 Requirements
-Stage 6 (Final End-to-End Integration, Edge Cases & Verification) will cover:
-1. End-to-end multi-role flow test (Business sends enquiry → Artist reviews & requests info → Business clarifies → Artist expresses interest).
-2. Rate-limiting edge-case testing (max 3 open enquiries per pair, submission velocity limits).
-3. In-app navigation & notification badge consistency across desktop and mobile.
-4. Final Stage 5/6 regression checks across existing Phase 1–4 features.
+### 17.7 Stage 6 Completion
+Stage 6 has been completed locally. See Section 18 below for full QA verification details.
+
+---
+
+## 18. Phase 5.1 Stage 6 — Complete End-to-End Quality Assurance & Platform Verification (2026-11-24)
+
+### 18.1 Overview
+Stage 6 represents the final validation gate for Phase 5.1 (Direct Booking Enquiries). All 6 stages defined in `PHASE_5_1_IMPLEMENTATION_PLAN.md` are now fully implemented, verified, and locked locally. The system allows verified businesses to enquire about booking published artists, supports bidirectional enquiry management (seen status, single-cycle clarification, non-binding expression of interest, and polite declines/withdrawals), strictly prevents calendar mutation and payments, and preserves immutable audit event history.
+
+### 18.2 UI Consistency Corrections Applied in Stage 6
+1. **In-App Withdrawal Transparency:** Corrected withdrawal confirmation modal in `BusinessEnquiriesPanel.tsx` to state explicitly that the withdrawal is reflected directly in the artist's dashboard with no email/SMS claims.
+2. **Distinct Business Filter Tabs:** Renamed `"Concluded"` tab to `"Declined / Withdrawn"` in `BusinessEnquiriesPanel.tsx` and isolated its filter predicate to `declined` or `withdrawn` only, guaranteeing zero overlap with the `"Artist Interested"` tab.
+3. **Clarified Open State Visibility:** Added an active alert banner for `clarified` enquiries in `ArtistEnquiriesInbox.tsx` within the `"Action Needed"` tab, ensuring artists immediately see client responses and can express interest or decline.
+4. **Non-Binding Language Consistency:** Reaffirmed non-binding disclaimers across all artist and business enquiry components, ensuring indicative budgets (`₹XX,XXX (indicative, non-binding)`) and interest expressions are never conflated with confirmed bookings.
+5. **Zero Mock Records:** Confirmed all dashboard views use live Supabase data via server actions.
+
+### 18.3 Verification Results Matrix
+- **Automated QA Suite (`scratch/verify_phase_5_1_stage_6.mjs`):** **48/48 tests passed (100%)**.
+  - *Suite 1 (Static Code & UI Consistency):* 6/6 passed.
+  - *Suite 2 (Input Validation Edge Cases):* 9/9 passed.
+  - *Suite 3 (Role-Based Authorization & RLS Isolation):* 10/10 passed.
+  - *Suite 4 (Complete Business-to-Artist Journey & Lifecycles):* 13/13 passed.
+  - *Suite 5 (Rate Limiting & Concurrency):* 2/2 passed (5/hour live rate limit verified).
+  - *Suite 6 (Regression & Core Route Verification):* 8/8 passed.
+- **Real Browser Automation:** Marked **NOT TESTED** (remote debugging port 9222 was not enabled). A 26-step manual QA verification protocol has been documented in `PHASE_5_1_STAGE_6_FINAL_QA.md`.
+- **TypeScript:** `npx tsc --noEmit` → **0 errors**.
+- **ESLint:** `npm run lint` → **0 errors** (36 pre-existing image/scratch warnings).
+- **Production Build:** `npm run build` → **22/22 routes rendered**.
+- **Security Audit:** `npm audit --omit=dev` → **0 vulnerabilities**.
+
+### 18.4 Phase 5.1 Architecture Handover Status
+- **Current Branch:** `master` (15 commits ahead of `origin/master`).
+- **Phase Status:** **PHASE 5.1 COMPLETED & LOCAL LOCKED (GO FOR REVIEW)**.
+- **Strict Boundary Reminder:** Phase 5.2 (formal contracts, binding confirmations, and payment gateways) must NOT be started without explicit written platform owner sign-off.
+- **Netlify Status:** Production deployment remains isolated on `f271d08`. The Next.js 16.4.6 security patch (`1128f4d`) is prepared for an isolated hotfix push if desired by the owner.
+
 
 
 
