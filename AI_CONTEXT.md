@@ -1156,7 +1156,8 @@ All integration checks executed with 100% pass rate:
 - **Next.js Security Upgrade (16.4.6):** ✅ COMPLETED & TESTED (resolved GHSA-mfr8-8qww-v76h; 0 production vulnerabilities).
 - **Phase 5.1 Stage 1 (Booking Enquiry Schema & RPCs):** ✅ FULLY COMPLETED & LIVE-VERIFIED in Supabase.
 - **Phase 5.1 Stage 2 (Server Actions & Zod Validation):** ✅ FULLY COMPLETED & LIVE-VERIFIED (36/36 tests passed).
-- **Phase 5.1 Stage 3 (Artist Dashboard Booking Enquiry UI):** ⏸️ AWAITING OWNER APPROVAL.
+- **Phase 5.1 Stage 3 (Business Enquiry Submission UI):** ✅ FULLY COMPLETED & LIVE-VERIFIED (15/15 tests passed).
+- **Phase 5.1 Stage 4 (Artist Dashboard Booking Enquiry UI):** ⏸️ AWAITING OWNER APPROVAL.
 - **Git / Netlify Guard:** Pushes to GitHub trigger automatic Netlify builds. Do not push without owner authorization.
 
 ---
@@ -1259,9 +1260,48 @@ All RPCs enforce authentication via `(SELECT auth.uid())`, check profile roles i
 ### 14.3 Automated Verification Results
 - **Suite:** `scratch/verify_phase_5_1_stage_2.mjs`
 - **Result:** **36 / 36 checks PASSED (100% pass rate)**.
-- **Coverage:** Zod validation unit tests (14 checks), authenticated session setup (3 checks), end-to-end lifecycle execution (14 checks), cross-account tenant isolation and retrieval (5 checks).
+- **Coverage:** Zod validation unit tests (14 checks), authenticated session setup (3 checks), end-to-end lifecycle execution (14 checks), cross-account tenant isolation and retrieval (5 checks: Tests 32–36).
 - **Calendar Isolation:** Zero calendar entries created in `public.artist_calendar_events`.
 - **Status Semantics:** Non-binding nature of `interested` preserved; terminal records do not consume open quotas.
+
+---
+
+## 15. Phase 5.1 Stage 3 — Business Booking Enquiry Submission UI (2026-11-23)
+
+### 15.1 Component Architecture & Public Profile Integration
+- **Component:** `app/components/BookingEnquirySection.tsx` (Client component with modal drawer).
+- **Integration Point:** `app/artists/[slug]/page.tsx` (Placed between the top hero card and the About section).
+- **Role-Based Visibility Matrix:**
+  - **Anonymous Visitor:** Sees informational planning card with "Sign In as Business" (`/login?redirectTo=/artists/${slug}`) and "Join as Business" (`/signup?role=business&redirectTo=/artists/${slug}`). No actionable enquiry submit button is exposed.
+  - **Artist Account:** Sees non-actionable notification ("You are logged in as an artist. Booking enquiries are submitted by business accounts."). Own profile displays owner indicator.
+  - **Administrator:** Sees non-actionable notice ("Administrator Mode: Booking enquiry submissions are reserved for business accounts.").
+  - **Business Account:** Sees primary CTA ("Send Booking Enquiry") opening the responsive modal.
+- **Form Controls & Constraints:**
+  - `eventDate`: HTML5 date input with `min` set to tomorrow in IST (`getMinimumEventDateIST()`) and 2-year upper bound.
+  - `eventType`: Dropdown covering `corporate`, `wedding`, `restaurant`, `festival`, `private`, `concert`, `other`.
+  - `eventLocation`: Text input (max 255 chars).
+  - `indicativeBudget`: Numeric currency input in INR (non-negative, capped at ₹10 Cr, optional).
+  - `requirements`: Textarea (max 2000 chars with live counter).
+  - `businessMessage`: Textarea (max 2000 chars with live counter).
+  - **Non-Binding Notice:** Displayed prominently: *"Sending an enquiry does not confirm a booking, guarantee artist availability or create any payment obligation."*
+  - **Duplicate Prevention:** Submit button is disabled with loading spinner while `isSubmitting` is true.
+  - **Success Presentation:** Replaces form with confirmed enquiry reference ID and direct link to Business Dashboard (`/dashboard/restaurant`).
+
+### 15.2 Verification Suite
+- **Suite:** `scratch/verify_phase_5_1_stage_3.mjs`
+- **Result:** **15 / 15 checks PASSED (100% pass rate)**.
+- **Coverage:** Public profile HTTP 200, anonymous CTA redirects, role checks, privilege revocation on anonymous RPC, server-side role blocking for artists, business submission execution, status 'submitted', single audit event creation, duplicate open date guard, and calendar isolation invariant.
+- **Compiler & Linter:** TypeScript (0 errors), ESLint (0 errors), npm audit (0 production vulnerabilities), Next.js build (22/22 routes compiled successfully).
+
+### 15.3 Isolated Security Deployment Plan
+- **Risk Analysis:** `master` is 11 commits ahead of `origin/master`. Pushing `master` to GitHub would automatically deploy Phase 4.7, Stage 1 SQL migrations, Stage 2 server actions, and Stage 3 UI to Netlify before public launch approval.
+- **Safe Hotfix Workflow:**
+  1. `git checkout -b hotfix/nextjs-16.4.6-patch origin/master`
+  2. Cherry-pick only commit `1128f4d` (`fix(security): upgrade next to 16.4.6 and eslint-config-next to 16.4.6`).
+  3. Verify `npm audit --omit=dev`, `npx tsc --noEmit`, and `npm run build` on the hotfix branch.
+  4. Deploy hotfix branch to Netlify via preview build or authorized push to `origin/master`.
+  5. Feature commits remain quarantined on local `master` branch.
+
 
 
 

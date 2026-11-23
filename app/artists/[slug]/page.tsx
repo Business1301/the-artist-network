@@ -7,8 +7,9 @@ import Navbar from "@/app/components/Navbar";
 import Footer from "@/app/components/Footer";
 import ShareArtistButton from "@/app/components/ShareArtistButton";
 import ArtistSocialLinks from "@/app/components/ArtistSocialLinks";
+import BookingEnquirySection from "@/app/components/BookingEnquirySection";
 import { getPublicArtistBySlug } from "@/app/actions/artist";
-import { getCurrentUser } from "@/app/auth/actions";
+import { getCurrentUser, CurrentUser } from "@/app/auth/actions";
 
 export const instant = false;
 
@@ -48,7 +49,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-async function ArtistProfileContent({ params }: PageProps) {
+async function ArtistProfileContent({
+  params,
+  currentUser,
+}: PageProps & { currentUser: CurrentUser | null }) {
   await connection();
   const { slug } = await params;
   const { profile, portfolio, isOwnerPreview } = await getPublicArtistBySlug(slug);
@@ -102,7 +106,7 @@ async function ArtistProfileContent({ params }: PageProps) {
       <div className="max-w-3xl mx-auto px-4 sm:px-6">
         
         {/* TOP PROFILE CARD matching Screenshot 2 */}
-        <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm overflow-hidden mb-10">
+        <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm overflow-hidden mb-6">
           {/* Main Hero Photo */}
           <div className="relative aspect-[16/10] sm:aspect-[16/9] w-full bg-zinc-950 overflow-hidden">
             {heroImage ? (
@@ -192,6 +196,14 @@ async function ArtistProfileContent({ params }: PageProps) {
             </div>
           </div>
         </div>
+
+        {/* BOOKING ENQUIRY INTERFACE (Phase 5.1 Stage 3) */}
+        <BookingEnquirySection
+          artistId={profile.id}
+          artistSlug={profile.slug}
+          artistStageName={profile.stage_name}
+          currentUser={currentUser}
+        />
 
         {/* SECTION: ABOUT matching Screenshots 2 & 3 */}
         <section className="mb-10">
@@ -377,7 +389,7 @@ export default async function PublicArtistProfilePage({ params }: PageProps) {
     <>
       <Navbar initialUser={currentUser} />
       <Suspense fallback={<ProfileLoadingSkeleton />}>
-        <ArtistProfileContent params={params} />
+        <ArtistProfileContent params={params} currentUser={currentUser} />
       </Suspense>
       <Footer />
     </>
