@@ -1153,8 +1153,10 @@ All integration checks executed with 100% pass rate:
 - **Phase 4.6 (Artist Calendar & Availability):** ✅ FULLY COMPLETED & LIVE-VERIFIED.
 - **Phase 4.7 (Legal Pages, Compliance & Footer):** ✅ FULLY COMPLETED.
 - **Pre-Launch Security & Live Testing:** ✅ FULLY COMPLETED.
+- **Next.js Security Upgrade (16.4.6):** ✅ COMPLETED & TESTED (resolved GHSA-mfr8-8qww-v76h; 0 production vulnerabilities).
 - **Phase 5.1 Stage 1 (Booking Enquiry Schema & RPCs):** ✅ FULLY COMPLETED & LIVE-VERIFIED in Supabase.
-- **Phase 5.1 Stage 2 (Server Actions & Validation):** ⏸️ AWAITING OWNER APPROVAL.
+- **Phase 5.1 Stage 2 (Server Actions & Zod Validation):** ✅ FULLY COMPLETED & LIVE-VERIFIED (36/36 tests passed).
+- **Phase 5.1 Stage 3 (Artist Dashboard Booking Enquiry UI):** ⏸️ AWAITING OWNER APPROVAL.
 - **Git / Netlify Guard:** Pushes to GitHub trigger automatic Netlify builds. Do not push without owner authorization.
 
 ---
@@ -1220,6 +1222,47 @@ All RPCs enforce authentication via `(SELECT auth.uid())`, check profile roles i
 - **Test Accounts Used:** Dedicated `.example` test accounts (Business, Secondary Business, Published Artist, Suspended Artist).
 - **Data Hygiene:** All test records were moved to terminal states; exactly 0 active/open enquiries remain in the database.
 - **Stage 2 Readiness:** Database layer is 100% verified and ready for Next.js Server Actions and Zod validation.
+
+---
+
+## 14. Next.js Security Upgrade & Phase 5.1 Stage 2 — Server Actions & Zod Validation (2026-11-23)
+
+### 14.1 Next.js Security Upgrade (GHSA-mfr8-8qww-v76h)
+- **Vulnerability Addressed:** Information disclosure across root params when a `'use cache'` function is called through `unstable_cache()` in Next.js 16.3.0–16.4.4.
+- **Upgraded Packages:**
+  - `next`: `16.4.3` → `16.4.6`
+  - `eslint-config-next`: `16.4.3` → `16.4.6`
+- **Verification:**
+  - `npm audit --omit=dev`: **0 vulnerabilities found**.
+  - `npx tsc --noEmit`: 0 errors.
+  - `npm run lint`: 0 errors.
+  - `npm run build`: All 22 routes compiled successfully with Turbopack and PPR.
+  - Live security regression test: All 31 core security and authentication invariants passed.
+- **Deployment Advisory:** Netlify production site `https://artist-net-v1.netlify.app` remains on previous build (`f271d08`). A security-only deployment recommendation is prepared, awaiting owner push authorization.
+
+### 14.2 Phase 5.1 Stage 2: Server Actions & Zod Validation
+- **Files Created:**
+  - `lib/enquiries/types.ts`: TypeScript contracts for `BookingEnquiry`, `BookingEnquiryEvent`, `BookingEnquiryWithDetails`, `EnquiryActionResult`, `EnquiryListFilter`, status helpers (`isOpenStatus`, `isTerminalStatus`, `isPastEventDate`), and IST minimum date calculator (`getMinimumEventDateIST`).
+  - `lib/enquiries/schemas.ts`: Strict Zod validation schemas for all actions (`submitEnquirySchema`, `respondEnquirySchema`, `clarifyEnquirySchema`, `withdrawEnquirySchema`, `enquiryListFilterSchema`). Includes Indian Standard Time future date enforcement, 2-year boundary, ₹10 crore budget cap, length restrictions, and action-specific refinement rules.
+  - `app/actions/enquiries.ts`: Strongly-typed Next.js Server Actions ("use server"):
+    1. `submitBookingEnquiryAction(input)`: Validates business role from `public.profiles`, executes `submit_booking_enquiry` RPC, revalidates `/dashboard/restaurant`.
+    2. `markEnquirySeenAction(enquiryId)`: Validates artist role, executes `respond_to_booking_enquiry('seen')`, revalidates `/dashboard/artist`.
+    3. `expressInterestAction(enquiryId, note)`: Validates artist role, executes `respond_to_booking_enquiry('interested')`, revalidates `/dashboard/artist`.
+    4. `declineEnquiryAction(enquiryId, reason)`: Validates artist role, executes `respond_to_booking_enquiry('decline')`, revalidates `/dashboard/artist`.
+    5. `requestInfoAction(enquiryId, question)`: Validates artist role and min-length, executes `respond_to_booking_enquiry('request_info')`, revalidates `/dashboard/artist`.
+    6. `clarifyEnquiryAction(input)`: Validates business role, executes `clarify_booking_enquiry` RPC, revalidates `/dashboard/restaurant`.
+    7. `withdrawEnquiryAction(enquiryId)`: Validates business role, executes `withdraw_booking_enquiry` RPC, revalidates `/dashboard/restaurant`.
+    8. `getBusinessEnquiriesAction(filter)`: Validates business role, queries sent enquiries with joined `artist_profiles` and chronological `booking_enquiry_events`.
+    9. `getArtistEnquiriesAction(filter)`: Validates artist role, queries received enquiries with safe `business_profile` fallback and chronological `booking_enquiry_events`.
+    10. `getEnquiryDetailsAction(enquiryId)`: Validates participant or admin role, fetches single enquiry with joined profile summaries and full audit trail.
+
+### 14.3 Automated Verification Results
+- **Suite:** `scratch/verify_phase_5_1_stage_2.mjs`
+- **Result:** **36 / 36 checks PASSED (100% pass rate)**.
+- **Coverage:** Zod validation unit tests (14 checks), authenticated session setup (3 checks), end-to-end lifecycle execution (14 checks), cross-account tenant isolation and retrieval (5 checks).
+- **Calendar Isolation:** Zero calendar entries created in `public.artist_calendar_events`.
+- **Status Semantics:** Non-binding nature of `interested` preserved; terminal records do not consume open quotas.
+
 
 
 
