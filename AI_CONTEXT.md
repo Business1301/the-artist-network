@@ -1554,6 +1554,23 @@ A security vulnerability in Next.js (GHSA-mfr8-8qww-v76h) required patching on t
    - 0 conflicts encountered. All 17 local Phase 5.1 development and QA commits fully preserved.
    - Quality gates on reconciled `master`: `npx tsc --noEmit` (0 errors), `npm run lint` (0 errors), dev server active.
 
+---
+
+## 20. Pre-Deployment Copy Corrections & Readiness Refinements (2026-11-24)
+
+### 20.1 Disclaimer & Terms Language Updates
+1. **Accurate Phase 5.1 Enquiries Scope (`app/disclaimer/page.tsx` & `app/terms/page.tsx`):**
+   - Explicitly clarified that non-binding booking enquiries and single-cycle clarifications are implemented in Phase 5.1.
+   - Enshrined key legal boundaries: enquiry submission does NOT confirm a booking; artist expression of interest is NOT contractual acceptance.
+   - Reaffirmed that formal binding electronic contracting, integrated UPI/card payments, advance escrow deposits, and automated settlements remain future capabilities (Phase 5.2 and beyond).
+2. **Contact & Privacy Placeholder Transparency (`app/contact/page.tsx` & `app/privacy/page.tsx`):**
+   - Labeled all email channels and entity details as non-operational during the pre-launch testing preview, preventing visitors from mistaking placeholders for active communication channels.
+   - Calibrated statutory compliance statements: explained that policies reflect statutory alignment with the DPDP Act 2023 and IT Act 2000, and that official Grievance Officer and corporate entity details will be designated and published prior to commercial launch.
+3. **Rollback Plan Correction:**
+   - Prohibited all force-pushing and history rewriting.
+   - Established primary rollback via Netlify Deploy UI (republishing verified deploy `7f1810e`) and secondary source rollback via reviewed forward-moving Git revert commits.
+
+
 
 
 

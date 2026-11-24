@@ -36,16 +36,23 @@ export default async function DisclaimerPage() {
 
           {/* Disclaimer Content */}
           <div className="space-y-10 text-sm sm:text-base text-gray-700 leading-relaxed">
-            {/* 1. Discovery Platform Scope */}
+            {/* 1. Discovery & Direct Enquiry Nature */}
             <section id="platform-nature">
               <h2 className="text-xl sm:text-2xl font-bold text-gray-950 mb-3">
-                1. Talent Discovery &amp; Showcase Directory Nature
+                1. Talent Discovery &amp; Direct Enquiry Nature
               </h2>
               <p className="mb-3">
-                The Artist Network functions primarily as an online talent discovery and portfolio showcase platform for artists and performers across India.
+                The Artist Network functions as an online talent discovery, portfolio showcase, and direct booking enquiry platform for artists and venue organizers across India.
               </p>
-              <div className="p-4 rounded-xl bg-purple-50 border border-purple-200 text-purple-950 text-xs sm:text-sm font-medium">
-                The Platform provides informational profiles, portfolio displays, and private calendar tools. The Platform does <strong>not</strong> currently operate an online booking checkout, payment escrow, digital payment processor, contract guarantor, or cancellation dispute-resolution mechanism.
+              <div className="p-4 rounded-xl bg-purple-50 border border-purple-200 text-purple-950 text-xs sm:text-sm font-medium space-y-2">
+                <p>
+                  <strong>Non-Binding Enquiry Framework:</strong> Booking enquiries submitted through the Platform represent non-binding expressions of interest to initiate direct communication regarding dates, requirements, and indicative budgets.
+                </p>
+                <ul className="list-disc pl-5 space-y-1 text-xs text-purple-900">
+                  <li>Submitting a booking enquiry does <strong>NOT</strong> confirm or guarantee an artist booking.</li>
+                  <li>An artist&apos;s expression of interest or response does <strong>NOT</strong> constitute a legally binding contractual acceptance.</li>
+                  <li>The Platform does <strong>NOT</strong> operate an online checkout, payment escrow, digital payment processing gateway, contract guarantor, or cancellation dispute-resolution mechanism.</li>
+                </ul>
               </div>
             </section>
 
@@ -99,16 +106,19 @@ export default async function DisclaimerPage() {
               </p>
             </section>
 
-            {/* 5. Future Features & Roadmap Transparency */}
+            {/* 5. Future Transactional Capabilities & Scope */}
             <section id="roadmap-disclaimer">
               <h2 className="text-xl sm:text-2xl font-bold text-gray-950 mb-3">
-                5. Status of Future Transactional Features
+                5. Status of Transactional &amp; Contracting Features
               </h2>
               <p className="mb-3">
-                Features such as in-platform booking enquiries, messaging, formal quotations, electronic contracting, integrated UPI/card payments, and escrow deposits are planned for future development phases (Phase 5 and beyond).
+                Phase 5.1 provides direct, non-binding booking enquiries and single-cycle clarifications between verified businesses and published artists.
               </p>
-              <p>
-                Until such features are officially deployed and documented with dedicated transactional terms, any communication or financial arrangement between users occurs strictly outside of the Platform and at the users&apos; sole discretion and risk.
+              <p className="mb-3">
+                Advanced transactional features — including formal binding electronic contracts, integrated UPI/card payment gateways, advance deposit escrows, and automated settlement workflows — are not currently active and remain planned for future platform phases (Phase 5.2 and beyond).
+              </p>
+              <p className="text-xs text-gray-600">
+                Any financial transactions, binding contracts, cancellation policies, or performance riders agreed upon between artists and clients must be conducted directly off-platform at the parties&apos; sole discretion, responsibility, and risk.
               </p>
             </section>
 

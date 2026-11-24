@@ -306,20 +306,19 @@ export default async function PrivacyPage() {
             {/* 11. Grievance Officer & Contact Details */}
             <section id="grievance-officer">
               <h2 className="text-xl sm:text-2xl font-bold text-gray-950 mb-3">
-                11. Grievance Officer &amp; Privacy Contact
+                11. Grievance Officer &amp; Privacy Contact (Framework Alignment)
               </h2>
               <p className="mb-3">
-                In compliance with the Information Technology Act, 2000 and the DPDP Act, 2023, the details of our designated Grievance Officer are set out below:
+                In alignment with the statutory principles of the Information Technology Act, 2000 and the Digital Personal Data Protection Act, 2023, an official Grievance Redressal Officer will be appointed and published prior to commercial public launch. During this testing preview, the designated responsibilities are structured as follows:
               </p>
               <div className="p-5 rounded-2xl bg-gray-50 border border-gray-200 text-xs sm:text-sm space-y-1.5 text-gray-700">
                 <p><strong>Designation:</strong> Grievance Redressal Officer</p>
-                <p><strong>Name:</strong> <span className="text-amber-800 font-mono">[To be designated by Platform Owner prior to public launch]</span></p>
-                <p><strong>Organization:</strong> The Artist Network</p>
-                <p><strong>Email:</strong> <span className="text-amber-800 font-mono">[grievance@theartistnetwork.in — Awaiting Owner Configuration]</span></p>
-                <p><strong>Response Timeline:</strong> Grievances will be acknowledged within 48 hours and resolved within 30 days as mandated under Indian rules.</p>
+                <p><strong>Officer Status:</strong> <span className="text-amber-800 font-medium">To be officially designated and published by platform owner prior to public launch</span></p>
+                <p><strong>Channel Status:</strong> <span className="text-amber-800 font-medium">Pending platform owner configuration (Non-operational during testing preview)</span></p>
+                <p><strong>Response Protocol:</strong> Statutory 48-hour acknowledgement and 30-day resolution timelines will become operational upon official appointment and launch.</p>
               </div>
               <p className="mt-3 text-xs text-gray-500">
-                For further contact options, please visit our <Link href="/contact" className="text-purple-600 font-semibold underline hover:text-purple-800">Contact Us Page</Link>.
+                For further details regarding testing status, please visit our <Link href="/contact" className="text-purple-600 font-semibold underline hover:text-purple-800">Contact Us Page</Link>.
               </p>
             </section>
 

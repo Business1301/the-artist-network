@@ -49,8 +49,8 @@ export default async function ContactPage() {
                 For questions about the platform, media inquiries, partnership discussions, or feedback on our testing preview.
               </p>
               <div className="p-3 rounded-xl bg-gray-50 border border-gray-100 text-xs text-gray-700">
-                <span className="block font-semibold text-gray-900">Email:</span>
-                <span className="font-mono text-purple-700">[contact@theartistnetwork.in — Awaiting Owner Configuration]</span>
+                <span className="block font-semibold text-gray-900">Channel Status:</span>
+                <span className="text-amber-800 font-medium">Pending platform owner configuration (Non-operational during testing preview)</span>
               </div>
             </div>
 
@@ -61,11 +61,11 @@ export default async function ContactPage() {
               </div>
               <h2 className="text-lg font-bold text-gray-900 mb-2">Artist &amp; Venue Support</h2>
               <p className="text-xs sm:text-sm text-gray-600 mb-4 leading-relaxed">
-                Need assistance with artist onboarding, portfolio uploads, calendar settings, or dashboard navigation?
+                Assistance with artist onboarding, portfolio uploads, calendar settings, or dashboard navigation.
               </p>
               <div className="p-3 rounded-xl bg-gray-50 border border-gray-100 text-xs text-gray-700">
                 <span className="block font-semibold text-gray-900">Support Desk:</span>
-                <span className="font-mono text-blue-700">[support@theartistnetwork.in — Awaiting Owner Configuration]</span>
+                <span className="text-amber-800 font-medium">Pending platform owner configuration (Non-operational during testing preview)</span>
               </div>
             </div>
 
@@ -74,15 +74,15 @@ export default async function ContactPage() {
               <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold mb-4">
                 ⚖️
               </div>
-              <h2 className="text-lg font-bold text-gray-900 mb-2">Grievance Redressal Officer</h2>
+              <h2 className="text-lg font-bold text-gray-900 mb-2">Grievance Redressal (Framework Alignment)</h2>
               <p className="text-xs sm:text-sm text-gray-600 mb-4 leading-relaxed">
-                Designated officer for legal grievances, privacy requests under the DPDP Act 2023, and IT Rules compliance.
+                In alignment with the Digital Personal Data Protection Act, 2023 and Information Technology Rules, a formal Grievance Officer will be designated prior to commercial launch.
               </p>
               <div className="p-3 rounded-xl bg-gray-50 border border-gray-100 text-xs text-gray-700 space-y-1">
-                <p><strong>Officer Name:</strong> <span className="font-mono text-gray-900">[To be designated by Owner]</span></p>
+                <p><strong>Officer Status:</strong> <span className="text-amber-800 font-medium">To be officially designated and published by platform owner prior to public launch</span></p>
                 <p><strong>Designation:</strong> Grievance Redressal Officer</p>
-                <p><strong>Email:</strong> <span className="font-mono text-emerald-700">[grievance@theartistnetwork.in]</span></p>
-                <p className="text-[11px] text-gray-500">Acknowledgement within 48 hours; resolution within 30 days.</p>
+                <p><strong>Channel Status:</strong> <span className="text-amber-800 font-medium">Non-operational during testing preview</span></p>
+                <p className="text-[11px] text-gray-500">Statutory acknowledgement and resolution timelines will take effect upon official designation.</p>
               </div>
             </div>
 
@@ -91,13 +91,13 @@ export default async function ContactPage() {
               <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center text-rose-700 font-bold mb-4">
                 🛡️
               </div>
-              <h2 className="text-lg font-bold text-gray-900 mb-2">Copyright &amp; Takedown Requests</h2>
+              <h2 className="text-lg font-bold text-gray-900 mb-2">Copyright &amp; Takedown Notices</h2>
               <p className="text-xs sm:text-sm text-gray-600 mb-4 leading-relaxed">
-                To report copyright infringement or submit an intermediary takedown notice under the IT Intermediary Rules.
+                Reporting copyright infringement or submitting an intermediary takedown notice under IT Intermediary Rules.
               </p>
               <div className="p-3 rounded-xl bg-gray-50 border border-gray-100 text-xs text-gray-700">
-                <span className="block font-semibold text-gray-900">Legal &amp; IP Notices:</span>
-                <span className="font-mono text-rose-700">[legal@theartistnetwork.in — Awaiting Owner Configuration]</span>
+                <span className="block font-semibold text-gray-900">Legal Desk:</span>
+                <span className="text-amber-800 font-medium">Pending platform owner configuration (Non-operational during testing preview)</span>
               </div>
             </div>
           </div>
@@ -108,20 +108,20 @@ export default async function ContactPage() {
               Entity &amp; Registered Office Information
             </h2>
             <p className="text-xs sm:text-sm text-gray-600 mb-4 leading-relaxed">
-              Pursuant to applicable Indian regulatory disclosures for online platforms:
+              Pursuant to applicable Indian regulatory disclosure frameworks for online platforms:
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-gray-700">
               <div>
                 <span className="block font-semibold text-gray-900">Operating Entity Name:</span>
-                <span className="font-mono text-gray-600">[Platform Owner / Entity Name — To be provided prior to public launch]</span>
+                <span className="text-amber-800 font-medium">Pending platform owner provision prior to commercial launch</span>
               </div>
               <div>
                 <span className="block font-semibold text-gray-900">Business Registration / CIN:</span>
-                <span className="font-mono text-gray-600">[Registration / CIN Number — To be provided prior to public launch]</span>
+                <span className="text-amber-800 font-medium">Pending platform owner provision prior to commercial launch</span>
               </div>
               <div>
                 <span className="block font-semibold text-gray-900">Registered Office Address:</span>
-                <span className="font-mono text-gray-600">[Physical Registered Address in India — To be provided prior to public launch]</span>
+                <span className="text-amber-800 font-medium">Pending physical address provision prior to commercial launch</span>
               </div>
               <div>
                 <span className="block font-semibold text-gray-900">Support Hours:</span>

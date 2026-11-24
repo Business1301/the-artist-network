@@ -48,9 +48,14 @@ export default async function TermsPage() {
               <p className="mb-3">
                 The Artist Network (&quot;Platform&quot;, &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) is a digital talent discovery and creative showcase directory focused on the Indian creative economy. The Platform enables artists (singers, musicians, DJs, bands, dancers, visual artists, and performers) to build professional portfolios, manage private availability calendars, and showcase their talents to event organizers, businesses, hospitality venues, and the general public.
               </p>
-              <p className="p-4 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 text-xs sm:text-sm font-medium">
-                <strong>Important Operational Clarification:</strong> The Platform currently operates solely as an informational discovery and showcase directory. The Platform does <strong>NOT</strong> operate or provide completed online booking, escrow payments, payment processing, contracts of engagement, refunds, or dispute-management workflows. Any bookings, client negotiations, fees, performance schedules, or contractual agreements are conducted directly and independently between artists and third parties off-platform.
-              </p>
+              <div className="p-4 rounded-xl bg-gray-50 border border-gray-200 text-gray-800 text-xs sm:text-sm font-medium space-y-2">
+                <p>
+                  <strong>Important Operational Clarification:</strong> The Platform enables direct, non-binding booking enquiries between registered businesses and published artists. Submitting an enquiry or receiving an artist&apos;s expression of interest does <strong>NOT</strong> constitute a confirmed booking, reservation, or legally binding contract.
+                </p>
+                <p className="text-xs text-gray-600">
+                  The Platform does <strong>NOT</strong> operate or provide completed online booking checkouts, payment processing, advance escrow deposits, contracts of engagement, refunds, or dispute-management workflows. Any commercial contracts, fee payments, rider arrangements, and performance schedules are conducted directly and independently between artists and clients off-platform.
+                </p>
+              </div>
             </section>
 
             {/* 2. Eligibility & Account Registration */}
@@ -251,7 +256,7 @@ export default async function TermsPage() {
                 These Terms and any dispute or claim arising out of or in connection with them or their subject matter shall be governed by and construed in accordance with the laws of the Republic of India, without regard to its conflict of law principles.
               </p>
               <p>
-                Any legal action, proceeding, or arbitration arising from these Terms shall be subject to the exclusive jurisdiction of the competent courts located in India <span className="text-xs text-gray-400">[Specific city/state jurisdiction to be confirmed prior to public launch by platform owner]</span>.
+                Any legal action, proceeding, or arbitration arising from these Terms shall be subject to the exclusive jurisdiction of the competent courts located in India (specific judicial city/state forum to be formally designated by the platform owner prior to commercial launch).
               </p>
             </section>
 
