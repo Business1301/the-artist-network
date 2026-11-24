@@ -1914,6 +1914,109 @@ Individual Booking database migration and UI implementation remain strictly on h
 - Additive versioned RPC (`submit_booking_enquiry_v2`) prepared in specification.
 - Recovery freeze mode and `ON DELETE RESTRICT` data retention safeguards prepared.
 
+---
+
+## 26. Phase 5.2A — Admin Artist Verification Management (2026-11-24)
+
+### 26.1 Motivation & Root Cause
+Phase 5.2A deployed public Verified Artist badges, but the admin interface lacked obvious controls to verify or unverify artists. Root causes:
+1. **Admin dashboard KPI card** for Published Artists linked to `/artists` (the public directory) rather than the admin applications view, and the Verified Badges card had no actionable link at all.
+2. **Applications table** had no dedicated "Verification Status" column — verification was indicated only by a tiny `✓` icon inside the artist name cell.
+3. **Verify/Unverify buttons** were buried at the bottom of a secondary slide-over detail drawer, invisible unless the admin already opened an individual artist's review panel.
+4. **No direct row-level actions** for published artists: a single `Review →` button per row was the only entry point to any action.
+5. **No sub-filter** to isolate "Unverified Published Artists" or "Verified Artists" without scrolling through all profiles.
+
+### 26.2 Changes Implemented
+
+#### `app/actions/admin.ts` (Server Actions)
+- Added `revalidatePath("/artists/[slug]", "page")` and `revalidatePath("/")` to **all six** admin moderation actions: `approveArtistApplication`, `rejectArtistApplication`, `verifyArtistApplication`, `unverifyArtistApplication`, `suspendArtistProfile`, `reinstateArtistProfile`.
+- Ensures that any moderation decision (approve, verify, suspend, etc.) immediately invalidates the artist's public profile page and the homepage, in addition to `/admin`, `/admin/applications`, `/admin/audit-logs`, and `/artists`.
+
+#### `app/admin/page.tsx` (Admin Dashboard Overview)
+- **Header**: Added prominent `🛡️ Manage Verification` button linking directly to `/admin/applications?status=published&verified=false` (shows only unverified published artists).
+- **Published Artists KPI card**: Updated footer link from `/artists` (public directory) to `/admin/applications?status=published` with label "Manage published →". Retained "Live directory ↗" as a secondary link.
+- **Verified Badges KPI card**: Added actionable footer link "Review unverified →" pointing to `/admin/applications?status=published&verified=false`. Changed percentage label from verbose string to compact "X% verified" format.
+
+#### `app/admin/applications/page.tsx` (Applications Route)
+- Updated `searchParams` type to `Promise<{ review?: string; status?: string; verified?: string }>`.
+- Passes `initialStatusFilter` and `initialVerifiedFilter` props to `ApplicationsManager`, enabling URL-driven deep-linking from the Admin Dashboard KPI cards.
+
+#### `app/components/ApplicationsManager.tsx` (Core Admin UI — Complete Rewrite)
+Full rewrite of the 705-line component, now 757 lines, with:
+
+1. **URL-driven state initialization**: `initialStatusFilter` and `initialVerifiedFilter` props set the initial tab and sub-filter from URL `searchParams` (e.g. `?status=published&verified=false` pre-selects "Published > Unverified").
+
+2. **Verification Sub-filter Pills**: When viewing "Published" or "All" artists, three pill buttons appear below the status tabs:
+   - "All Published (N)" — shows all published regardless of verification
+   - "🛡️ Needs Review (N)" — shows only unverified published artists
+   - "✓ Verified Only (N)" — shows only verified published artists
+
+3. **New "Verification Status" table column**: Each row now shows a clear `✓ Verified` emerald/purple badge or `● Not Verified` neutral badge, alongside the existing Profile Status column.
+
+4. **Direct row-level actions for published artists**: The single `Review →` button is replaced with three inline actions:
+   - `Live ↗` — opens the artist's public profile in a new tab
+   - `🛡️ Verify` or `Unverify` — opens the appropriate confirmation modal
+   - `Review →` — opens the existing detailed drawer for full portfolio inspection
+
+5. **Verify Artist Confirmation Modal** (required before granting verification):
+   - Shows artist summary card with public profile link
+   - Displays the "Verification Scope Advisory Notice" (matches Phase 5.2A wording)
+   - Requires three administrator affirmation checkboxes (all required):
+     - Stage identity and profile ownership confirmed
+     - Portfolio media and social links inspected
+     - Profile complies with community guidelines
+   - "Confirm & Grant Verified Badge" button is disabled until all three are checked
+
+6. **Revoke Verification Confirmation Modal**: Clear single-step confirmation explaining the artist remains published (not removed) but loses the Verified badge.
+
+7. **Global dismissible notification banner**: Replaces the inline modal-only notice; success/error messages now appear at the top of the manager and can be dismissed.
+
+8. **Existing features fully preserved**: Suspend, Reinstate, Approve, Reject, detail drawer, portfolio review, audit log references, and all existing handler logic unchanged.
+
+### 26.3 Authorization & Security Analysis
+
+| Check | Result |
+|---|---|
+| `requireAdmin()` calls `auth.getUser()` + `public.profiles` DB query | ✅ PASS |
+| `verifyArtistApplication` calls `requireAdmin()` before any DB access | ✅ PASS |
+| `unverifyArtistApplication` calls `requireAdmin()` before any DB access | ✅ PASS |
+| Both actions route through `admin_moderate_artist_profile` RPC only | ✅ PASS |
+| No `SERVICE_ROLE_KEY` in any client-exposed file | ✅ PASS |
+| Verify/Unverify UI gated to `profile_status === "published"` only | ✅ PASS |
+| Anonymous RPC calls `admin_moderate_artist_profile` → PostgreSQL `42501` | ✅ PASS |
+| Anonymous direct `UPDATE is_verified` on `artist_profiles` → RLS silent block (value unchanged) | ✅ PASS |
+| `admin_audit_logs` inaccessible to anonymous users | ✅ PASS |
+| UUID format validation on `artistId` before DB query | ✅ PASS |
+| `admin.ts` has `"use server"` directive | ✅ PASS |
+| All 3 confirmation checklist items required before verify submission | ✅ PASS |
+| Separate confirmation dialog for unverification | ✅ PASS |
+| Authenticated Artist/Business role DENY | 🔶 BLOCKED (no test credentials in env; enforced via `requireAdmin()` server guard) |
+| Authenticated Individual DENY | 🔶 BLOCKED (Phase 5.2B role not yet implemented) |
+
+### 26.4 Cache Revalidation Coverage
+All six admin moderation server actions now revalidate:
+- `/admin` — Overview page KPI metrics
+- `/admin/applications` — Application list
+- `/admin/audit-logs` — Audit trail
+- `/artists` — Public directory listing
+- `/artists/[slug]` (page segment) — Individual public profile pages
+- `/` — Homepage (FeaturedArtists, hero counters)
+
+### 26.5 Test Results
+- **Security test suite** (`scratch/test_admin_verification_ux.mjs`): **48 PASS, 0 FAIL, 3 BLOCKED** (blocked = no test credentials; authorization enforced by static code analysis).
+- **Verified artist acceptance suite** (`scratch/test_verified_artist_acceptance.mjs`): **8/8 PASS**.
+- `npx tsc --noEmit`: **0 errors**.
+- `npm run lint`: **0 errors, 49 pre-existing warnings** (all in pre-existing `<img>` and scratch file unused vars — none in modified files).
+- `npm run build`: **22/22 routes — all clean**.
+- `npm audit --omit=dev`: **0 vulnerabilities**.
+
+### 26.6 Deployment Status
+- **Local commit**: `feat(admin): improve artist verification management and cache refresh`
+- **Origin/master**: `771b1bb` (Phase 5.2A live release).
+- **Local HEAD**: ahead of origin by 2 commits (`c472af8` docs, plus this commit).
+- **NO push to GitHub or Netlify** — awaiting platform owner deployment authorization.
+- **No SQL executed, no database schema changes, no live artist records modified.**
+
 
 
 

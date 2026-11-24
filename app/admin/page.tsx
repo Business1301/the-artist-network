@@ -25,7 +25,13 @@ export default async function AdminOverviewPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/admin/applications?status=published&verified=false"
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-semibold text-xs transition-colors shadow-2xs"
+          >
+            <span>🛡️ Manage Verification</span>
+          </Link>
           <Link
             href="/admin/applications"
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs transition-colors shadow-sm"
@@ -86,12 +92,19 @@ export default async function AdminOverviewPage() {
               Live and discoverable on marketplace
             </p>
           </div>
-          <div className="mt-4 pt-3 border-t border-gray-100">
+          <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
             <Link
-              href="/artists"
+              href="/admin/applications?status=published"
               className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 inline-flex items-center gap-1"
             >
-              Browse live directory &rarr;
+              Manage published &rarr;
+            </Link>
+            <Link
+              href="/artists"
+              target="_blank"
+              className="text-[11px] font-medium text-gray-400 hover:text-gray-600 inline-flex items-center gap-0.5"
+            >
+              Live directory ↗
             </Link>
           </div>
         </div>
@@ -112,12 +125,18 @@ export default async function AdminOverviewPage() {
               Vetted talent with verification badge
             </p>
           </div>
-          <div className="mt-4 pt-3 border-t border-gray-100">
+          <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
             <span className="text-xs text-gray-500">
               {metrics.publishedArtists > 0
-                ? `${Math.round((metrics.verifiedArtists / metrics.publishedArtists) * 100)}% of published artists`
+                ? `${Math.round((metrics.verifiedArtists / metrics.publishedArtists) * 100)}% verified`
                 : "No published artists yet"}
             </span>
+            <Link
+              href="/admin/applications?status=published&verified=false"
+              className="text-xs font-semibold text-purple-700 hover:text-purple-800 inline-flex items-center gap-1"
+            >
+              Review unverified &rarr;
+            </Link>
           </div>
         </div>
 

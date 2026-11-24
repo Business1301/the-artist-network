@@ -119,6 +119,8 @@ export async function approveArtistApplication(
   revalidatePath("/admin/applications");
   revalidatePath("/admin/audit-logs");
   revalidatePath("/artists");
+  revalidatePath("/artists/[slug]", "page");
+  revalidatePath("/");
 
   return {
     success: true,
@@ -173,6 +175,9 @@ export async function rejectArtistApplication(
   revalidatePath("/admin");
   revalidatePath("/admin/applications");
   revalidatePath("/admin/audit-logs");
+  revalidatePath("/artists");
+  revalidatePath("/artists/[slug]", "page");
+  revalidatePath("/");
 
   return {
     success: true,
@@ -219,6 +224,8 @@ export async function verifyArtistApplication(
   revalidatePath("/admin/applications");
   revalidatePath("/admin/audit-logs");
   revalidatePath("/artists");
+  revalidatePath("/artists/[slug]", "page");
+  revalidatePath("/");
 
   return {
     success: true,
@@ -264,6 +271,8 @@ export async function unverifyArtistApplication(
   revalidatePath("/admin/applications");
   revalidatePath("/admin/audit-logs");
   revalidatePath("/artists");
+  revalidatePath("/artists/[slug]", "page");
+  revalidatePath("/");
 
   return {
     success: true,
@@ -314,6 +323,8 @@ export async function suspendArtistProfile(
   revalidatePath("/admin/applications");
   revalidatePath("/admin/audit-logs");
   revalidatePath("/artists");
+  revalidatePath("/artists/[slug]", "page");
+  revalidatePath("/");
 
   return {
     success: true,
@@ -354,6 +365,8 @@ export async function reinstateArtistProfile(
   revalidatePath("/admin/applications");
   revalidatePath("/admin/audit-logs");
   revalidatePath("/artists");
+  revalidatePath("/artists/[slug]", "page");
+  revalidatePath("/");
 
   return {
     success: true,

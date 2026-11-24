@@ -4,7 +4,7 @@ import ApplicationsManager from "@/app/components/ApplicationsManager";
 export const instant = false;
 
 interface ApplicationsPageProps {
-  searchParams: Promise<{ review?: string }>;
+  searchParams: Promise<{ review?: string; status?: string; verified?: string }>;
 }
 
 export default async function ApplicationsPage({
@@ -21,7 +21,7 @@ export default async function ApplicationsPage({
           Artist Applications & Moderation
         </h1>
         <p className="text-xs sm:text-sm text-gray-500 mt-1">
-          Review submitted artist onboarding applications, examine media portfolios, and execute atomic moderation decisions.
+          Review submitted artist onboarding applications, examine media portfolios, manage verification badges, and execute atomic moderation decisions.
         </p>
       </div>
 
@@ -29,6 +29,8 @@ export default async function ApplicationsPage({
       <ApplicationsManager
         initialApplications={initialApplications}
         initialSelectedId={resolvedParams.review}
+        initialStatusFilter={resolvedParams.status}
+        initialVerifiedFilter={resolvedParams.verified}
       />
     </div>
   );
