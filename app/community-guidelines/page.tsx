@@ -182,7 +182,7 @@ export default async function CommunityGuidelinesPage() {
         </div>
       </main>
 
-      <Footer />
+      <Footer user={currentUser} />
     </>
   );
 }

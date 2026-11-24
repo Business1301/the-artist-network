@@ -276,7 +276,7 @@ export default async function CategoriesPage() {
         </div>
       </main>
 
-      <Footer />
+      <Footer user={currentUser} />
     </>
   );
 }

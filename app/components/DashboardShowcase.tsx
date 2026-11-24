@@ -2,8 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import type { CurrentUser } from "@/app/auth/actions";
 
-export default function DashboardShowcase() {
+interface DashboardShowcaseProps {
+  initialUser?: CurrentUser | null;
+}
+
+export default function DashboardShowcase({ initialUser }: DashboardShowcaseProps) {
   const [activePortal, setActivePortal] = useState<"artist" | "venue">("artist");
 
   return (
@@ -126,15 +131,55 @@ export default function DashboardShowcase() {
 
               {/* Action Banner */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-100">
-                <p className="text-xs text-gray-500 text-center sm:text-left">
-                  Sign up as an artist to create your showcase and manage your availability.
-                </p>
-                <Link
-                  href="/signup"
-                  className="w-full sm:w-auto px-6 py-2.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md transition-all text-center"
-                >
-                  Join as an Artist →
-                </Link>
+                {!initialUser ? (
+                  <>
+                    <p className="text-xs text-gray-500 text-center sm:text-left">
+                      Sign up as an artist to create your showcase and manage your availability.
+                    </p>
+                    <Link
+                      href="/signup?role=artist"
+                      className="w-full sm:w-auto px-6 py-2.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md transition-all text-center"
+                    >
+                      Join as an Artist →
+                    </Link>
+                  </>
+                ) : initialUser.role === "artist" ? (
+                  <>
+                    <p className="text-xs text-gray-500 text-center sm:text-left">
+                      Manage your showcase profile, technical rider, and private performance calendar.
+                    </p>
+                    <Link
+                      href="/dashboard/artist"
+                      className="w-full sm:w-auto px-6 py-2.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md transition-all text-center"
+                    >
+                      Open Artist Dashboard →
+                    </Link>
+                  </>
+                ) : initialUser.role === "business" ? (
+                  <>
+                    <p className="text-xs text-gray-500 text-center sm:text-left">
+                      Explore artist profiles, review technical rider terms, and send direct booking enquiries.
+                    </p>
+                    <Link
+                      href="/artists"
+                      className="w-full sm:w-auto px-6 py-2.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md transition-all text-center"
+                    >
+                      Browse Artist Directory →
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs text-gray-500 text-center sm:text-left">
+                      Inspect artist applications, moderate profiles, and audit platform activity.
+                    </p>
+                    <Link
+                      href="/admin"
+                      className="w-full sm:w-auto px-6 py-2.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md transition-all text-center"
+                    >
+                      Open Admin Control Center →
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -190,33 +235,89 @@ export default function DashboardShowcase() {
                 </div>
               </div>
 
-              {/* Roadmap Transparency Card */}
+              {/* Booking Enquiries Transparency Card */}
               <div className="p-5 rounded-2xl border border-blue-100 bg-blue-50/50 mb-6">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200 uppercase tracking-wider">
-                    Roadmap Transparency
+                    Phase 5.1 Active Feature
                   </span>
-                  <span className="text-xs font-bold text-blue-700">Upcoming Features</span>
+                  <span className="text-xs font-bold text-blue-700">Direct Booking Enquiries</span>
                 </div>
                 <h4 className="text-base font-bold text-gray-900">
-                  Direct In-App Enquiries &amp; Venue Booking (Planned)
+                  Direct In-App Booking Enquiries &amp; Status Tracking
                 </h4>
                 <p className="text-xs text-gray-600 mt-1 mb-2 leading-relaxed">
-                  In-platform booking requests, venue roster planning, and direct messaging workflows are scheduled for future development phases. Currently, clients can discover talent, inspect portfolios, and explore artists across India.
+                  Registered business and venue accounts can submit direct, non-binding booking enquiries specifying event date, venue city, event type, and budget. Both parties manage enquiries directly in their dedicated dashboards.
                 </p>
               </div>
 
               {/* Action Banner */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-100">
-                <p className="text-xs text-gray-500 text-center sm:text-left">
-                  Explore our public directory to find singers, DJs, bands, dancers, and visual artists.
-                </p>
-                <Link
-                  href="/artists"
-                  className="w-full sm:w-auto px-6 py-2.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md transition-all text-center"
-                >
-                  Explore Artist Directory →
-                </Link>
+                {!initialUser ? (
+                  <>
+                    <p className="text-xs text-gray-500 text-center sm:text-left">
+                      Explore our public directory or register your venue to submit booking enquiries.
+                    </p>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <Link
+                        href="/artists"
+                        className="flex-1 sm:flex-initial px-5 py-2.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md transition-all text-center"
+                      >
+                        Explore Artists →
+                      </Link>
+                      <Link
+                        href="/signup?role=business"
+                        className="flex-1 sm:flex-initial px-5 py-2.5 rounded-full border border-purple-300 text-purple-700 hover:bg-purple-50 font-bold text-xs transition-all text-center"
+                      >
+                        Register Venue
+                      </Link>
+                    </div>
+                  </>
+                ) : initialUser.role === "business" ? (
+                  <>
+                    <p className="text-xs text-gray-500 text-center sm:text-left">
+                      Review sent booking enquiries and manage ongoing artist communications.
+                    </p>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <Link
+                        href="/dashboard/restaurant"
+                        className="flex-1 sm:flex-initial px-6 py-2.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md transition-all text-center"
+                      >
+                        Venue Dashboard →
+                      </Link>
+                      <Link
+                        href="/artists"
+                        className="flex-1 sm:flex-initial px-5 py-2.5 rounded-full border border-purple-300 text-purple-700 hover:bg-purple-50 font-bold text-xs transition-all text-center"
+                      >
+                        Find Artists
+                      </Link>
+                    </div>
+                  </>
+                ) : initialUser.role === "artist" ? (
+                  <>
+                    <p className="text-xs text-gray-500 text-center sm:text-left">
+                      Explore the public directory to see how artists are presented to clients across India.
+                    </p>
+                    <Link
+                      href="/artists"
+                      className="w-full sm:w-auto px-6 py-2.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md transition-all text-center"
+                    >
+                      Explore Artist Directory →
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs text-gray-500 text-center sm:text-left">
+                      Inspect booking enquiries and monitor venue marketplace operations.
+                    </p>
+                    <Link
+                      href="/admin"
+                      className="w-full sm:w-auto px-6 py-2.5 rounded-full bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md transition-all text-center"
+                    >
+                      Admin Dashboard →
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </div>

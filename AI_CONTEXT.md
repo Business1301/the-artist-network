@@ -1571,6 +1571,102 @@ A security vulnerability in Next.js (GHSA-mfr8-8qww-v76h) required patching on t
    - **Primary Emergency Recovery:** Netlify Dashboard 1-click redeploy of known-good baseline `7f1810e`.
    - **Secondary Source Rollback Protocol:** Reviewed dedicated branch (`rollback/restore-7f1810e`), restoring the exact baseline tree via `git restore --source=7f1810e --staged --worktree -- .`, confirming clean tree match with `git diff 7f1810e`, passing all local verification gates, and committing a single forward-moving revert commit.
 
+---
+
+## 21. Platform-Wide Role-Aware UX Audit & Multi-Role Authorization Hardening (2026-11-24)
+
+### 21.1 Overview & Root Cause Analysis
+During manual testing of the deployed preview, the platform owner discovered that an authenticated Business account user could still see a "Join as Artist" CTA button. Clicking this CTA navigated the authenticated Business user to the Artist signup form (`/signup`).
+
+A thorough code audit revealed that:
+1. **Footer Component (`app/components/Footer.tsx`):** Hardcoded static `{ label: "Join as an Artist", href: "/signup" }` under "For Artists" was rendered for all visitors across all 18 public and dashboard pages, regardless of authentication state or account role.
+2. **Dashboard Showcase (`app/components/DashboardShowcase.tsx`):** An action banner button hardcoded to `<Link href="/signup">Join as an Artist →</Link>` was rendered on the homepage for all users.
+3. **For Businesses Section (`app/components/ForBusinesses.tsx`):** A secondary button `<Link href="/signup">Register as Venue</Link>` was rendered on the homepage without inspecting user authentication or role.
+4. **Public Artist Profile (`app/artists/[slug]/page.tsx`):** Unconditional callout `<Link href="/login?redirectTo=...">Login as Client to check prices!</Link>` was rendered even when the visitor was already an authenticated Business client.
+5. **Registration & Login Pages (`app/signup/page.tsx` & `app/login/page.tsx`):** Implemented purely as client components (`"use client"`) without server-side route guards, allowing authenticated users (Artists, Businesses, Admins) who directly entered or were linked to `/signup` or `/login` to access the registration and login forms.
+6. **Navbar Component (`app/components/Navbar.tsx`):** The anonymous visitor state featured only "Join as Artist" without a prominent "Join as Business" option, and on `/signup` and `/login` rendered guest navigation shells because no `initialUser` was passed.
+
+### 21.2 Architecture & Implementation Corrections
+1. **Server-Side Route Protection on `/signup` (`app/signup/page.tsx` & `SignUpClient.tsx`):**
+   - Transformed `app/signup/page.tsx` into an async Server Component with `await connection()` and `await getCurrentUser()`.
+   - Authoritative server guard: If an authenticated session is detected via `supabase.auth.getUser()` and validated against `public.profiles`:
+     - `role === "admin"` → redirects immediately (HTTP 307) to `/admin`.
+     - `role === "business"` → redirects immediately (HTTP 307) to `/dashboard/restaurant`.
+     - `role === "artist"` → redirects immediately (HTTP 307) to `/dashboard/artist`.
+   - Prevents role-manipulation via query parameters (`?role=artist`, `?role=business`) or direct form access.
+   - Form logic moved cleanly into client component `app/signup/SignUpClient.tsx` for anonymous visitors.
+2. **Server-Side Route Protection on `/login` (`app/login/page.tsx` & `LoginClient.tsx`):**
+   - Transformed `app/login/page.tsx` into an async Server Component.
+   - If an authenticated session exists, routes the user via `getSafeRedirectPath(rawRedirectTo, currentUser.role)` to their authorized dashboard or validated safe redirect path.
+   - Form logic encapsulated in client component `app/login/LoginClient.tsx` for unauthenticated visitors.
+3. **Role-Aware Global Footer (`app/components/Footer.tsx`):**
+   - Accepts `user?: CurrentUser | null`. Dynamically resolves `await getCurrentUser()` if not supplied.
+   - Dynamically adapts navigation columns:
+     - **Anonymous:** Displays "Join as an Artist" (`/signup?role=artist`) and "Register as Venue" (`/signup?role=business`).
+     - **Artist:** Displays "Artist Dashboard", "Artist Calendar", "Edit Showcase Profile", and "Community Guidelines". Registration CTAs completely eliminated.
+     - **Business:** Displays "Talent Sourcing" with "Browse Artists Directory", "Categories", and "Venue Dashboard". Registration CTAs completely eliminated.
+     - **Admin:** Displays "Admin Dashboard" and "Review Applications". Registration CTAs completely eliminated.
+4. **Interactive Dashboard Showcase (`app/components/DashboardShowcase.tsx`):**
+   - Refactored to accept `initialUser?: CurrentUser | null`.
+   - Replaced static "Join as an Artist →" and "Register Venue" buttons with role-aware actions:
+     - Anonymous: "Join as an Artist →" and "Register Venue".
+     - Business: "Browse Artist Directory →" and "Venue Dashboard →".
+     - Artist: "Open Artist Dashboard →" and "Explore Artist Directory →".
+     - Admin: "Open Admin Control Center →" and "Admin Dashboard →".
+5. **For Businesses Section (`app/components/ForBusinesses.tsx`):**
+   - Refactored to accept `user?: CurrentUser | null`.
+   - Anonymous: "Discover Artists" and "Register as Venue".
+   - Business: "Discover Artists" and "Venue Dashboard".
+   - Artist: "Discover Artists" and "Artist Dashboard".
+   - Admin: "Discover Artists" and "Admin Dashboard".
+6. **Public Artist Profile Role-Aware Pricing (`app/artists/[slug]/page.tsx`):**
+   - Anonymous: Retains "Login as Client to check prices!" (`/login?redirectTo=...`).
+   - Business: Displays starting price directly (`Starting from ₹X / unit`) with a "Verified Client View" badge. Eliminates login prompt.
+   - Artist: Displays indicative rate with an "Artist View" badge.
+   - Admin: Displays starting price with an "Admin View" badge.
+7. **Navbar Navigation Shell (`app/components/Navbar.tsx`):**
+   - For anonymous visitors, provides explicit dual pathways: "Join as Business" (`/signup?role=business`) and "Join as Artist" (`/signup?role=artist`) on both desktop and mobile drawers.
+   - For authenticated users, hides all registration CTAs and displays the role-specific dashboard link and sign-out button.
+8. **Consistent Prop Propagation Across All Pages:**
+   - Propagated `user={currentUser}` / `initialUser={currentUser}` across `app/page.tsx`, `app/artists/page.tsx`, `app/artists/[slug]/page.tsx`, `app/categories/page.tsx`, `app/community-guidelines/page.tsx`, `app/contact/page.tsx`, `app/disclaimer/page.tsx`, `app/opportunities/page.tsx`, `app/privacy/page.tsx`, `app/terms/page.tsx`, and dashboard layouts.
+
+### 21.3 Final Platform Role-Visibility Matrix
+
+| Surface / Component | Anonymous Visitor | Authenticated Artist | Authenticated Business | Authenticated Administrator |
+| :--- | :--- | :--- | :--- | :--- |
+| **Top Navbar (Desktop)** | Sign In, Join as Business, Join as Artist | 🎨 Artist Dashboard, Log Out | 🏢 Business Dashboard, Log Out | 🛡️ Admin Dashboard, Log Out |
+| **Top Navbar (Mobile)** | Sign In, Join as Business, Join as Artist | User pill, 🎨 Artist Dashboard, Log Out | User pill, 🏢 Business Dashboard, Log Out | User pill, 🛡️ Admin Dashboard, Log Out |
+| **Hero Section (Home)** | Discover Artists, Join as an Artist | Discover Artists, Artist Dashboard | Discover Artists, Business Dashboard | Discover Artists, Admin Dashboard |
+| **For Businesses (Home)** | Discover Artists, Register as Venue | Discover Artists, Artist Dashboard | Discover Artists, Venue Dashboard | Discover Artists, Admin Dashboard |
+| **Dashboard Showcase (Home)**| Join as an Artist → / Register Venue | Open Artist Dashboard → | Browse Artist Directory → / Venue Dashboard → | Open Admin Control Center → |
+| **Artist CTA Banner** | Join as an Artist, How It Works | Manage My Profile / Status-specific | Discover Artists, Venue Dashboard | Admin Control Center, Applications |
+| **Global Footer** | Join as an Artist, Register as Venue | Artist Dashboard, Calendar, Edit Profile | Browse Artists, Categories, Venue Dashboard | Admin Dashboard, Applications |
+| **Artist Directory** | Browse cards, Filter, View profile | Browse cards, Filter, View profile | Browse cards, Filter, View profile | Browse cards, Filter, View profile |
+| **Artist Profile Pricing** | "Login as Client to check prices!" | Indicative Rate (Artist View) | Starting Rate ₹X (Verified Client View) | Starting Rate ₹X (Admin View) |
+| **Booking Enquiry UI** | Sign In as Business / Join as Business | "Logged in as artist" advisory notice | Full Enquiry Submission & Clarification UI | Admin Read-Only Notice |
+| **`/signup` Route** | Form rendered (200 OK) | 307 Redirect → `/dashboard/artist` | 307 Redirect → `/dashboard/restaurant` | 307 Redirect → `/admin` |
+| **`/login` Route** | Form rendered (200 OK) | 307 Redirect → `/dashboard/artist` | 307 Redirect → `/dashboard/restaurant` | 307 Redirect → `/admin` |
+| **Cross-Role Dashboards** | 307 Redirect → `/login` | `/dashboard/restaurant` → `/dashboard/artist` | `/dashboard/artist` → `/dashboard/restaurant` | Cross-access denied |
+
+### 21.4 Automated Verification Suite
+- Comprehensive automated test suite created: `scratch/test_role_aware_ux.mjs`.
+- Total executed tests: **53 / 53 passed (0 failures)**.
+- Scenarios validated:
+  - Anonymous visitor homepage and navigation controls: 9/9 passed.
+  - Anonymous route accessibility (`/signup`, `/login`, dashboard locks): 5/5 passed.
+  - Authenticated business homepage and CTA isolation: 12/12 passed.
+  - Authenticated business route redirects (`/signup`, `/signup?role=artist`, `/signup?role=business`, `/login`, cross-role `/dashboard/artist`): 5/5 passed.
+  - Authenticated artist homepage and CTA isolation: 11/11 passed.
+  - Authenticated artist route redirects (`/signup`, `/signup?role=business`, `/login`, cross-role `/dashboard/restaurant`): 4/4 passed.
+  - Public artist profile role-aware pricing (Anonymous vs Business vs Artist): 5/5 passed.
+
+### 21.5 Quality Gates
+- `npx tsc --noEmit`: 0 errors.
+- `npm run lint`: 0 errors (38 pre-existing image/scratch warnings).
+- `npm run build`: 22/22 routes rendered cleanly.
+- `npm audit --omit=dev`: found 0 vulnerabilities.
+
+
 
 
 

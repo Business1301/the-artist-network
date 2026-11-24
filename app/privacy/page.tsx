@@ -335,7 +335,7 @@ export default async function PrivacyPage() {
         </div>
       </main>
 
-      <Footer />
+      <Footer user={currentUser} />
     </>
   );
 }

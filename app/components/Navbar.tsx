@@ -191,7 +191,14 @@ export default function Navbar({ initialUser }: NavbarProps) {
                 </Link>
 
                 <Link
-                  href="/signup"
+                  href="/signup?role=business"
+                  className="hidden lg:inline-flex px-3.5 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-800 font-bold text-xs shadow-2xs transition-colors"
+                >
+                  Join as Business
+                </Link>
+
+                <Link
+                  href="/signup?role=artist"
                   className="hidden sm:inline-flex px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition-colors"
                 >
                   Join as Artist
@@ -282,7 +289,14 @@ export default function Navbar({ initialUser }: NavbarProps) {
                   Sign In
                 </Link>
                 <Link
-                  href="/signup"
+                  href="/signup?role=business"
+                  onClick={() => setMenuOpen(false)}
+                  className="w-full text-center py-2.5 rounded-xl border border-purple-200 bg-purple-50 text-purple-700 text-sm font-bold shadow-xs transition-colors"
+                >
+                  Join as Business
+                </Link>
+                <Link
+                  href="/signup?role=artist"
                   onClick={() => setMenuOpen(false)}
                   className="w-full text-center py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-xs transition-colors"
                 >

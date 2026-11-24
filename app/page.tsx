@@ -41,20 +41,20 @@ export default async function HomePage() {
         <HowItWorks />
 
         {/* Interactive Dashboard Showcase for Artists & Restaurants */}
-        <DashboardShowcase />
+        <DashboardShowcase initialUser={currentUser} />
 
         {/* 7. Opportunities Teaser */}
         <OpportunitiesTeaser />
 
         {/* 8. For Businesses & Event Organizers */}
-        <ForBusinesses />
+        <ForBusinesses user={currentUser} />
 
         {/* 9. Artist Call to Action */}
         <ArtistCTA user={currentUser} artistStatus={artistStatus} />
       </main>
 
       {/* 10. Footer */}
-      <Footer />
+      <Footer user={currentUser} />
     </>
   );
 }

@@ -26,7 +26,7 @@ export default async function ArtistDashboardLayout({
     <>
       <Navbar initialUser={verifiedArtist} />
       {children}
-      <Footer />
+      <Footer user={verifiedArtist} />
     </>
   );
 }

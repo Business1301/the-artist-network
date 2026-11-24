@@ -135,7 +135,7 @@ export default async function DisclaimerPage() {
         </div>
       </main>
 
-      <Footer />
+      <Footer user={currentUser} />
     </>
   );
 }

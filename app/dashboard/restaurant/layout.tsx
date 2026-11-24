@@ -23,7 +23,7 @@ export default async function RestaurantDashboardLayout({
     <>
       <Navbar initialUser={verifiedBusiness} />
       {children}
-      <Footer />
+      <Footer user={verifiedBusiness} />
     </>
   );
 }

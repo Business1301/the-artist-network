@@ -1,44 +1,80 @@
 import Link from "next/link";
+import { getCurrentUser, type CurrentUser } from "@/app/auth/actions";
 
-const footerColumns = [
-  {
-    heading: "Platform",
-    links: [
-      { label: "Discover Artists", href: "/artists" },
-      { label: "Categories", href: "/categories" },
-      { label: "Opportunities Preview", href: "/opportunities" },
-      { label: "How It Works", href: "/#how-it-works" },
-      { label: "For Venues & Clients", href: "/#for-businesses" },
-    ],
-  },
-  {
-    heading: "For Artists",
-    links: [
-      { label: "Join as an Artist", href: "/signup" },
-      { label: "Artist Dashboard", href: "/dashboard/artist" },
-      { label: "Artist Calendar", href: "/dashboard/artist/calendar" },
-      { label: "Community Guidelines", href: "/community-guidelines" },
-    ],
-  },
-  {
-    heading: "Support & Trust",
-    links: [
-      { label: "Contact Us", href: "/contact" },
-      { label: "Community Guidelines", href: "/community-guidelines" },
-      { label: "Platform Disclaimer", href: "/disclaimer" },
-    ],
-  },
-  {
-    heading: "Legal & Privacy",
-    links: [
-      { label: "Terms & Conditions", href: "/terms" },
-      { label: "Privacy Policy", href: "/privacy" },
-      { label: "Platform Disclaimer", href: "/disclaimer" },
-    ],
-  },
-];
+interface FooterProps {
+  user?: CurrentUser | null;
+}
 
-export default function Footer() {
+export default async function Footer({ user }: FooterProps) {
+  let resolvedUser = user;
+  if (resolvedUser === undefined) {
+    resolvedUser = await getCurrentUser();
+  }
+
+  // Build role-aware navigation columns
+  const platformLinks = [
+    { label: "Discover Artists", href: "/artists" },
+    { label: "Categories", href: "/categories" },
+    { label: "Opportunities Preview", href: "/opportunities" },
+    { label: "How It Works", href: "/#how-it-works" },
+  ];
+
+  if (!resolvedUser) {
+    platformLinks.push({ label: "For Venues & Clients", href: "/#for-businesses" });
+    platformLinks.push({ label: "Register as Venue", href: "/signup?role=business" });
+  } else if (resolvedUser.role === "business") {
+    platformLinks.push({ label: "Venue Dashboard", href: "/dashboard/restaurant" });
+  } else if (resolvedUser.role === "admin") {
+    platformLinks.push({ label: "Admin Dashboard", href: "/admin" });
+    platformLinks.push({ label: "Review Applications", href: "/admin/applications" });
+  }
+
+  const artistLinks: { label: string; href: string }[] = [];
+  if (!resolvedUser) {
+    artistLinks.push({ label: "Join as an Artist", href: "/signup?role=artist" });
+    artistLinks.push({ label: "Community Guidelines", href: "/community-guidelines" });
+  } else if (resolvedUser.role === "artist") {
+    artistLinks.push({ label: "Artist Dashboard", href: "/dashboard/artist" });
+    artistLinks.push({ label: "Artist Calendar", href: "/dashboard/artist/calendar" });
+    artistLinks.push({ label: "Edit Showcase Profile", href: "/dashboard/artist/edit" });
+    artistLinks.push({ label: "Community Guidelines", href: "/community-guidelines" });
+  } else if (resolvedUser.role === "business") {
+    artistLinks.push({ label: "Browse Artists Directory", href: "/artists" });
+    artistLinks.push({ label: "Categories", href: "/categories" });
+    artistLinks.push({ label: "Community Guidelines", href: "/community-guidelines" });
+  } else {
+    // Admin
+    artistLinks.push({ label: "Manage Artists", href: "/admin" });
+    artistLinks.push({ label: "Community Guidelines", href: "/community-guidelines" });
+  }
+
+  const footerColumns = [
+    {
+      heading: "Platform",
+      links: platformLinks,
+    },
+    {
+      heading: resolvedUser?.role === "business" ? "Talent Sourcing" : "For Artists",
+      links: artistLinks,
+    },
+    {
+      heading: "Support & Trust",
+      links: [
+        { label: "Contact Us", href: "/contact" },
+        { label: "Community Guidelines", href: "/community-guidelines" },
+        { label: "Platform Disclaimer", href: "/disclaimer" },
+      ],
+    },
+    {
+      heading: "Legal & Privacy",
+      links: [
+        { label: "Terms & Conditions", href: "/terms" },
+        { label: "Privacy Policy", href: "/privacy" },
+        { label: "Platform Disclaimer", href: "/disclaimer" },
+      ],
+    },
+  ];
+
   return (
     <footer className="bg-gray-950 text-gray-300">
       {/* Main footer */}

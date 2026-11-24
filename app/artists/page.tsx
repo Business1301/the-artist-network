@@ -380,7 +380,7 @@ export default async function ArtistsPage(props: PageProps) {
           artistStatus={artistStatus}
         />
       </Suspense>
-      <Footer />
+      <Footer user={currentUser} />
     </>
   );
 }

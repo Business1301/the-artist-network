@@ -14,7 +14,7 @@ export default async function OpportunitiesPage() {
     <>
       <Navbar initialUser={currentUser} />
       <OpportunitiesClient />
-      <Footer />
+      <Footer user={currentUser} />
     </>
   );
 }

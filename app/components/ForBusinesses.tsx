@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { CurrentUser } from "@/app/auth/actions";
 
 const perks = [
   {
@@ -23,7 +24,11 @@ const perks = [
   },
 ];
 
-export default function ForBusinesses() {
+interface ForBusinessesProps {
+  user?: CurrentUser | null;
+}
+
+export default function ForBusinesses({ user }: ForBusinessesProps) {
   return (
     <section id="for-businesses" className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-purple-950 via-purple-900 to-indigo-900 relative overflow-hidden">
 
@@ -58,12 +63,38 @@ export default function ForBusinesses() {
               >
                 Discover Artists
               </Link>
-              <Link
-                href="/signup"
-                className="px-7 py-3.5 border border-white/30 text-white font-bold rounded-full hover:bg-white/10 transition-all text-sm text-center"
-              >
-                Register as Venue
-              </Link>
+              {!user && (
+                <Link
+                  href="/signup?role=business"
+                  className="px-7 py-3.5 border border-white/30 text-white font-bold rounded-full hover:bg-white/10 transition-all text-sm text-center"
+                >
+                  Register as Venue
+                </Link>
+              )}
+              {user?.role === "business" && (
+                <Link
+                  href="/dashboard/restaurant"
+                  className="px-7 py-3.5 border border-white/30 text-white font-bold rounded-full hover:bg-white/10 transition-all text-sm text-center"
+                >
+                  Venue Dashboard
+                </Link>
+              )}
+              {user?.role === "artist" && (
+                <Link
+                  href="/dashboard/artist"
+                  className="px-7 py-3.5 border border-white/30 text-white font-bold rounded-full hover:bg-white/10 transition-all text-sm text-center"
+                >
+                  Artist Dashboard
+                </Link>
+              )}
+              {user?.role === "admin" && (
+                <Link
+                  href="/admin"
+                  className="px-7 py-3.5 border border-white/30 text-white font-bold rounded-full hover:bg-white/10 transition-all text-sm text-center"
+                >
+                  Admin Dashboard
+                </Link>
+              )}
             </div>
           </div>
 

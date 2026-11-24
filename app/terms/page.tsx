@@ -276,7 +276,7 @@ export default async function TermsPage() {
         </div>
       </main>
 
-      <Footer />
+      <Footer user={currentUser} />
     </>
   );
 }

@@ -176,23 +176,74 @@ async function ArtistProfileContent({
             {/* Divider */}
             <div className="border-t border-gray-100 my-5" />
 
-            {/* Pricing / Client Check Callout matching Screenshot 2 */}
+            {/* Pricing / Client Check Callout */}
             <div className="flex items-center justify-between gap-3">
-              <Link
-                href={`/login?redirectTo=/artists/${profile.slug}`}
-                className="text-sm sm:text-base font-semibold text-gray-800 hover:text-blue-600 transition-colors"
-              >
-                Login as Client to check prices!
-              </Link>
+              {!currentUser ? (
+                <>
+                  <Link
+                    href={`/login?redirectTo=/artists/${profile.slug}`}
+                    className="text-sm sm:text-base font-semibold text-gray-800 hover:text-blue-600 transition-colors"
+                  >
+                    Login as Client to check prices!
+                  </Link>
 
-              {/* Circular Info Icon */}
-              <Link
-                href={`/login?redirectTo=/artists/${profile.slug}`}
-                className="w-6 h-6 rounded-full border-2 border-blue-400 text-blue-500 hover:border-blue-600 flex items-center justify-center text-xs font-bold transition-colors"
-                title="Login to view rates and booking fees"
-              >
-                ℹ
-              </Link>
+                  {/* Circular Info Icon */}
+                  <Link
+                    href={`/login?redirectTo=/artists/${profile.slug}`}
+                    className="w-6 h-6 rounded-full border-2 border-blue-400 text-blue-500 hover:border-blue-600 flex items-center justify-center text-xs font-bold transition-colors"
+                    title="Login to view rates and booking fees"
+                  >
+                    ℹ
+                  </Link>
+                </>
+              ) : currentUser.role === "business" ? (
+                <>
+                  <div className="text-sm sm:text-base font-bold text-gray-900">
+                    {profile.starting_price ? (
+                      <span>
+                        Starting from{" "}
+                        <span className="text-emerald-700">
+                          ₹{profile.starting_price.toLocaleString("en-IN")}
+                        </span>
+                        {profile.pricing_unit ? ` / ${profile.pricing_unit}` : ""}
+                      </span>
+                    ) : (
+                      <span className="text-gray-600 font-medium">Indicative rate on enquiry</span>
+                    )}
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 uppercase tracking-wider">
+                    Verified Client View
+                  </span>
+                </>
+              ) : currentUser.role === "artist" ? (
+                <>
+                  <div className="text-xs sm:text-sm text-gray-600">
+                    Indicative Rate:{" "}
+                    <span className="font-semibold text-gray-800">
+                      {profile.starting_price
+                        ? `₹${profile.starting_price.toLocaleString("en-IN")}${profile.pricing_unit ? ` / ${profile.pricing_unit}` : ""}`
+                        : "Available on enquiry"}
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 uppercase tracking-wider">
+                    Artist View
+                  </span>
+                </>
+              ) : (
+                <>
+                  <div className="text-xs sm:text-sm text-gray-600">
+                    Starting Rate:{" "}
+                    <span className="font-semibold text-gray-800">
+                      {profile.starting_price
+                        ? `₹${profile.starting_price.toLocaleString("en-IN")}${profile.pricing_unit ? ` / ${profile.pricing_unit}` : ""}`
+                        : "Not specified"}
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 uppercase tracking-wider">
+                    Admin View
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -391,7 +442,7 @@ export default async function PublicArtistProfilePage({ params }: PageProps) {
       <Suspense fallback={<ProfileLoadingSkeleton />}>
         <ArtistProfileContent params={params} currentUser={currentUser} />
       </Suspense>
-      <Footer />
+      <Footer user={currentUser} />
     </>
   );
 }
