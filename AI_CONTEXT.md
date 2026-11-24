@@ -1790,8 +1790,8 @@ Live probe (`scratch/probe_storage_rls_jpeg.mjs`) confirmed:
 - Application code never calls `storage.from(...).remove(...)`; portfolio item deletion deletes the database record only. Hence `DELETE` permission on storage is omitted.
 
 ### 23.5 Revised Hardened SQL Migration
-**File:** `supabase/migrations/artist_media_storage_rls.sql`
-**Status:** Prepared, pending owner review and execution.
+**File:** `supabase/migrations/20261124061326_artist_media_storage_rls.sql`
+**Status:** Executed and recorded in Supabase schema migrations under version `20261124061326`.
 
 Key security enhancements:
 1. **Authoritative Role Validation:** Every policy enforces:
@@ -1835,7 +1835,7 @@ Post-Migration Live Results:
 - **Immediate Live Site Impact:**
   - The currently deployed Netlify site (`85df6f9`) uses `upsert: true`. Because the migration provides both INSERT and UPDATE policies, **artist image uploads on the live website are fully functional immediately without redeployment**.
   - No separate application deployment is required to resolve the live bug.
-- **Rollback SQL:** Available in `supabase/migrations/artist_media_storage_rls.sql` if ever needed.
+- **Rollback SQL:** Available in `supabase/migrations/20261124061326_artist_media_storage_rls.sql` if ever needed.
 
 ---
 
