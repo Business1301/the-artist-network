@@ -1,29 +1,17 @@
 -- ==============================================================================
--- THE ARTIST NETWORK — Phase 5.2B: Individual Booking Accounts
+-- THE ARTIST NETWORK — Phase 5.2B: Individual Booking Accounts (Corrected)
 -- Migration: 20261125000000_individual_booking.sql
 --
 -- ⚠️  REVIEW-ONLY — DO NOT EXECUTE ON PRODUCTION WITHOUT OWNER SIGN-OFF
 --
--- Purpose:
---   1. Add 'individual' to public.profiles.role CHECK constraint
---   2. Update handle_new_user() trigger to allow individual role
---   3. Add requester_id / requester_type columns to booking_enquiries (nullable,
---      additive — backward-compatible with all existing Business enquiries)
---   4. BEFORE INSERT trigger: auto-populates requester_id/type for legacy 7-arg RPC
---   5. Add 'individual' to booking_enquiry_events.actor_role CHECK
---   6. New RPC: submit_booking_enquiry_v2 (Business + Individual)
---   7. New RPC: withdraw_booking_enquiry_v2 (requester_id-aware)
---   8. New RPC: clarify_booking_enquiry_v2 (requester_id-aware)
---   9. New RLS policies for Individual access
---  10. Performance indexes
---
--- Backward Compatibility Guarantees:
---   - Original submit_booking_enquiry (7-arg) continues to work for Business.
---   - business_id column remains in all existing rows; NOT NULL constraint NOT touched.
---   - Trigger automatically sets requester_id = business_id, requester_type = 'business'
---     for any row where requester_id IS NULL at INSERT time.
---   - All existing RLS policies remain active.
---
+-- Tasks Addressed:
+--   1. Fix business_id nullability (DROP NOT NULL safely, add requester check constraint)
+--   2. Restore shared concurrency protection (tan_enq_biz lock namespace shared between v1 and v2)
+--   3. Idempotent backfill of historical Business enquiries (requester_id = business_id, requester_type = 'business')
+--   4. Guest count persistence (guest_count INTEGER column, parameter, validation)
+--   5. Consistent account deletion and retention policy (ON DELETE CASCADE alignment, non-destructive forward recovery)
+--   6. Standardize withdrawal (allow withdrawal after artist interest: submitted, seen, info_requested, clarified, interested)
+--   7. Security hardening (explicit role validation, NULL prevention, strict search_path = '', direct client writes revoked)
 -- ==============================================================================
 
 BEGIN;
@@ -40,15 +28,15 @@ ALTER TABLE public.profiles
     CHECK (role IN ('artist', 'business', 'admin', 'individual'));
 
 -- ============================================================
--- 2. Update handle_new_user() to allow 'individual' role
---    (re-create with same SECURITY DEFINER / search_path pattern)
+-- 2. Hardened handle_new_user() Trigger Function
+--    (SECURITY DEFINER, search_path = '', fully-qualified catalog)
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
-SECURITY DEFINER
-SET search_path = public
 LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
 AS $$
 DECLARE
   assigned_role     TEXT;
@@ -57,7 +45,7 @@ DECLARE
   user_contact_name TEXT;
 BEGIN
   -- Restrict role: only 'artist', 'business', or 'individual' permitted
-  -- from signup metadata.  Admin role CANNOT be self-assigned.
+  -- from signup metadata. Admin role CANNOT be self-assigned.
   IF (NEW.raw_user_meta_data->>'role') = 'business' THEN
     assigned_role := 'business';
   ELSIF (NEW.raw_user_meta_data->>'role') = 'individual' THEN
@@ -66,11 +54,11 @@ BEGIN
     assigned_role := 'artist';
   END IF;
 
-  user_full_name    := COALESCE(NEW.raw_user_meta_data->>'full_name', '');
-  user_biz_name     := COALESCE(NEW.raw_user_meta_data->>'business_name', '');
-  user_contact_name := COALESCE(NEW.raw_user_meta_data->>'contact_name', user_full_name);
+  user_full_name    := pg_catalog.coalesce(NEW.raw_user_meta_data->>'full_name', '');
+  user_biz_name     := pg_catalog.coalesce(NEW.raw_user_meta_data->>'business_name', '');
+  user_contact_name := pg_catalog.coalesce(NEW.raw_user_meta_data->>'contact_name', user_full_name);
 
-  -- Insert profile
+  -- Insert profile with validated role
   INSERT INTO public.profiles (id, role, full_name)
   VALUES (
     NEW.id,
@@ -78,11 +66,11 @@ BEGIN
     CASE
       WHEN assigned_role = 'business' AND user_contact_name <> '' THEN user_contact_name
       WHEN user_full_name <> '' THEN user_full_name
-      ELSE split_part(NEW.email, '@', 1)
+      ELSE pg_catalog.split_part(NEW.email, '@', 1)
     END
   );
 
-  -- If business, also initialize business_profile
+  -- If business, initialize business_profile
   IF assigned_role = 'business' AND user_biz_name <> '' THEN
     INSERT INTO public.business_profiles (id, business_name, contact_name)
     VALUES (NEW.id, user_biz_name, user_contact_name);
@@ -92,7 +80,6 @@ BEGIN
 END;
 $$;
 
--- Re-attach trigger (DROP IF EXISTS is safe; it was already created)
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
@@ -100,24 +87,52 @@ CREATE TRIGGER on_auth_user_created
   EXECUTE FUNCTION public.handle_new_user();
 
 -- ============================================================
--- 3. Add requester_id / requester_type to booking_enquiries
---    (nullable, additive — does NOT break existing constraints)
+-- 3. Schema Adjustments on public.booking_enquiries:
+--    - Make business_id NULLABLE (for individual enquiries)
+--    - Add requester_id (UUID FK -> profiles ON DELETE CASCADE)
+--    - Add requester_type ('business' | 'individual')
+--    - Add guest_count (INTEGER, 1 to 100,000)
+-- ============================================================
+
+-- Safely make business_id nullable
+ALTER TABLE public.booking_enquiries
+  ALTER COLUMN business_id DROP NOT NULL;
+
+-- Add new columns
+ALTER TABLE public.booking_enquiries
+  ADD COLUMN IF NOT EXISTS requester_id UUID
+    REFERENCES public.profiles(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS requester_type TEXT
+    CHECK (requester_type IN ('business', 'individual')),
+  ADD COLUMN IF NOT EXISTS guest_count INTEGER
+    CHECK (guest_count IS NULL OR (guest_count > 0 AND guest_count <= 100000));
+
+-- ============================================================
+-- 4. Idempotent Backfill of Historical Business Enquiries
+-- ============================================================
+
+UPDATE public.booking_enquiries
+SET requester_id = business_id,
+    requester_type = 'business'
+WHERE requester_id IS NULL AND business_id IS NOT NULL;
+
+-- ============================================================
+-- 5. Strict Requester Integrity Constraint
+--    - Business enquiries must have matching business_id and requester_id
+--    - Individual enquiries must have business_id IS NULL and requester_id set
 -- ============================================================
 
 ALTER TABLE public.booking_enquiries
-  ADD COLUMN IF NOT EXISTS requester_id UUID
-    REFERENCES public.profiles(id) ON DELETE SET NULL,
-  ADD COLUMN IF NOT EXISTS requester_type TEXT
-    CHECK (requester_type IN ('business', 'individual'));
+  DROP CONSTRAINT IF EXISTS booking_enquiries_requester_check;
+
+ALTER TABLE public.booking_enquiries
+  ADD CONSTRAINT booking_enquiries_requester_check CHECK (
+    (requester_type = 'business' AND business_id IS NOT NULL AND requester_id = business_id) OR
+    (requester_type = 'individual' AND business_id IS NULL AND requester_id IS NOT NULL)
+  );
 
 -- ============================================================
--- 4. BEFORE INSERT trigger: backward-compat legacy RPC rows
---
---    If a row is inserted without requester_id (i.e., via the
---    old 7-argument submit_booking_enquiry), the trigger derives
---    requester_id = business_id  and  requester_type = 'business'.
---    This ensures the new columns are populated for all rows,
---    without modifying the existing RPC at all.
+-- 6. BEFORE INSERT Trigger: Backward Compatibility for Legacy RPC
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.populate_legacy_requester()
@@ -127,10 +142,22 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 BEGIN
+  -- If inserted via legacy 7-argument submit_booking_enquiry (v1)
   IF NEW.requester_id IS NULL AND NEW.business_id IS NOT NULL THEN
-    NEW.requester_id  := NEW.business_id;
+    NEW.requester_id   := NEW.business_id;
     NEW.requester_type := 'business';
   END IF;
+
+  -- Ensure business enquiries maintain business_id = requester_id
+  IF NEW.requester_type = 'business' AND NEW.business_id IS NULL THEN
+    NEW.business_id := NEW.requester_id;
+  END IF;
+
+  -- Ensure individual enquiries strictly have business_id IS NULL
+  IF NEW.requester_type = 'individual' THEN
+    NEW.business_id := NULL;
+  END IF;
+
   RETURN NEW;
 END;
 $$;
@@ -146,7 +173,7 @@ CREATE TRIGGER trg_populate_legacy_requester
   EXECUTE FUNCTION public.populate_legacy_requester();
 
 -- ============================================================
--- 5. Add 'individual' to booking_enquiry_events.actor_role
+-- 7. Add 'individual' to booking_enquiry_events.actor_role
 -- ============================================================
 
 ALTER TABLE public.booking_enquiry_events
@@ -157,24 +184,11 @@ ALTER TABLE public.booking_enquiry_events
     CHECK (actor_role IN ('business', 'artist', 'admin', 'individual'));
 
 -- ============================================================
--- 6. RPC: public.submit_booking_enquiry_v2()
+-- 8. RPC: submit_booking_enquiry_v2()
 --
--- Security Definer: Authenticated Business OR Individual accounts.
--- Strict search path: ''
---
--- Concurrency Locks (Strict Uniform Order):
---   1. pg_advisory_xact_lock('tan_enq_req:' || requester_id)
+-- Concurrency Locks (Strict Uniform Order, SHARED with Phase 5.1):
+--   1. pg_advisory_xact_lock('tan_enq_biz:' || requester_id)
 --   2. pg_advisory_xact_lock('tan_enq_pair:' || requester_id || ':' || artist_id)
---
--- Rate Limits & Invariants (mirror Business limits):
---   - Role IN ('business', 'individual') in public.profiles.
---   - Target artist profile_status = 'published'.
---   - No self-enquiry.
---   - Event date >= tomorrow in Indian Standard Time (Asia/Kolkata).
---   - Max 3 OPEN enquiries per (requester, artist) pair.
---   - Duplicate check: No other OPEN enquiry for exact same artist and date.
---   - Max 10 OPEN enquiries platform-wide for this requester.
---   - Velocity rate limit: Max 5 submissions in last 1 hour.
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.submit_booking_enquiry_v2(
@@ -185,7 +199,8 @@ CREATE OR REPLACE FUNCTION public.submit_booking_enquiry_v2(
   p_requirements      TEXT    DEFAULT NULL,
   p_indicative_budget NUMERIC DEFAULT NULL,
   p_message           TEXT    DEFAULT NULL,
-  p_requester_type    TEXT    DEFAULT 'business'
+  p_requester_type    TEXT    DEFAULT 'business',
+  p_guest_count       INTEGER DEFAULT NULL
 )
 RETURNS UUID
 LANGUAGE plpgsql
@@ -226,26 +241,25 @@ BEGIN
     RAISE EXCEPTION 'Authentication required to submit a booking enquiry' USING ERRCODE = '42501';
   END IF;
 
-  -- 3. Verify caller role from public.profiles (fail-closed, never trust metadata)
+  -- 3. Verify caller role from public.profiles (fail closed, never trust client parameters or metadata)
   SELECT role INTO v_requester_role
   FROM public.profiles
   WHERE id = v_requester_id;
 
-  IF v_requester_role NOT IN ('business', 'individual') THEN
+  IF v_requester_role IS NULL OR v_requester_role NOT IN ('business', 'individual') THEN
     RAISE EXCEPTION 'Access Denied: Only registered business or individual accounts can submit booking enquiries' USING ERRCODE = '42501';
   END IF;
 
-  -- 4. Validate and sanitize requester_type parameter (must match actual DB role)
-  IF p_requester_type NOT IN ('business', 'individual') THEN
+  -- 4. Validate requester_type parameter (must strictly match verified DB role)
+  IF p_requester_type IS NULL OR p_requester_type NOT IN ('business', 'individual') THEN
     RAISE EXCEPTION 'Invalid Requester Type: Must be business or individual' USING ERRCODE = '23514';
   END IF;
 
-  -- Enforce: requester_type parameter must match the authenticated user's actual role
   IF p_requester_type <> v_requester_role THEN
-    RAISE EXCEPTION 'Access Denied: Requester type parameter does not match your account role' USING ERRCODE = '42501';
+    RAISE EXCEPTION 'Access Denied: Requester type parameter does not match your verified account role' USING ERRCODE = '42501';
   END IF;
 
-  v_safe_requester_type := v_requester_role; -- Use DB-verified role only
+  v_safe_requester_type := v_requester_role;
 
   -- 5. Prevent self-enquiries
   IF v_requester_id = p_artist_id THEN
@@ -284,7 +298,12 @@ BEGIN
     RAISE EXCEPTION 'Invalid Budget: Indicative budget cannot be negative' USING ERRCODE = '23514';
   END IF;
 
-  -- 10. Trim string parameters
+  -- 10. Validate guest count if provided
+  IF p_guest_count IS NOT NULL AND (p_guest_count <= 0 OR p_guest_count > 100000) THEN
+    RAISE EXCEPTION 'Invalid Guest Count: Estimated guests must be between 1 and 100,000' USING ERRCODE = '23514';
+  END IF;
+
+  -- 11. Trim string parameters
   v_trimmed_location := NULLIF(pg_catalog.btrim(p_event_location), '');
   v_trimmed_reqs     := NULLIF(pg_catalog.btrim(p_requirements), '');
   v_trimmed_msg      := NULLIF(pg_catalog.btrim(p_message), '');
@@ -301,13 +320,15 @@ BEGIN
     RAISE EXCEPTION 'Message cannot exceed 2000 characters' USING ERRCODE = '23514';
   END IF;
 
-  -- 11. Acquire transaction-level advisory locks in STRICT UNIFORM ORDER
-  -- Lock 1: Requester lock (serializes all submissions by this requester)
-  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('tan_enq_req:' || v_requester_id::text)::bigint);
-  -- Lock 2: Pair lock (serializes submissions between this requester and target artist)
+  -- 12. Acquire transaction-level advisory locks in STRICT UNIFORM ORDER
+  -- SHARED LOCK KEY: Uses 'tan_enq_biz:' prefix for all requesters, ensuring that
+  -- legacy v1 and new v2 calls lock on the EXACT same namespace.
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('tan_enq_biz:' || v_requester_id::text)::bigint);
   PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('tan_enq_pair:' || v_requester_id::text || ':' || p_artist_id::text)::bigint);
 
-  -- 12. Check 12a: Max 3 OPEN enquiries per (requester, artist) pair
+  -- 13. Anti-Spam Quota Checks
+  -- Check 13a: Max 3 OPEN enquiries per (requester, artist) pair
+  -- (Note: 'interested' is non-binding and intentionally excluded from open counts)
   SELECT pg_catalog.count(*) INTO v_active_pair_count
   FROM public.booking_enquiries
   WHERE requester_id = v_requester_id
@@ -318,7 +339,7 @@ BEGIN
     RAISE EXCEPTION 'Active Limit Reached: You have 3 open enquiries with this artist. Please await a response before sending more.' USING ERRCODE = '23514';
   END IF;
 
-  -- Check 12b: Duplicate open enquiry for exact same event date
+  -- Check 13b: Duplicate open enquiry for exact same event date
   SELECT pg_catalog.count(*) INTO v_duplicate_count
   FROM public.booking_enquiries
   WHERE requester_id = v_requester_id
@@ -330,7 +351,7 @@ BEGIN
     RAISE EXCEPTION 'Duplicate Enquiry: You already have an open enquiry with this artist for %', p_event_date USING ERRCODE = '23514';
   END IF;
 
-  -- Check 12c: Max 10 OPEN enquiries platform-wide per requester
+  -- Check 13c: Max 10 OPEN enquiries platform-wide per requester
   SELECT pg_catalog.count(*) INTO v_active_req_count
   FROM public.booking_enquiries
   WHERE requester_id = v_requester_id
@@ -340,7 +361,7 @@ BEGIN
     RAISE EXCEPTION 'Platform Limit Reached: You have 10 open enquiries across all artists. Please wait for responses before sending more.' USING ERRCODE = '23514';
   END IF;
 
-  -- Check 12d: Velocity Rate Limit (Max 5 submissions in last 1 hour)
+  -- Check 13d: Velocity Rate Limit (Max 5 submissions in last 1 hour)
   SELECT pg_catalog.count(*) INTO v_hourly_count
   FROM public.booking_enquiries
   WHERE requester_id = v_requester_id
@@ -350,23 +371,37 @@ BEGIN
     RAISE EXCEPTION 'Rate Limit Exceeded: Maximum 5 enquiries per hour permitted. Please try again later.' USING ERRCODE = '23514';
   END IF;
 
-  -- 13. Insert enquiry record
-  --     business_id is NULL for individual enquiries (new schema supports nullable)
-  --     requester_id / requester_type are always set here (trigger also fires as safety net)
+  -- 14. Insert enquiry record
   INSERT INTO public.booking_enquiries (
     business_id,
-    requester_id, requester_type,
-    artist_id, status, event_date, event_type,
-    event_location, requirements, indicative_budget, business_message
+    requester_id,
+    requester_type,
+    artist_id,
+    status,
+    event_date,
+    event_type,
+    event_location,
+    requirements,
+    indicative_budget,
+    business_message,
+    guest_count
   ) VALUES (
     CASE WHEN v_safe_requester_type = 'business' THEN v_requester_id ELSE NULL END,
-    v_requester_id, v_safe_requester_type,
-    p_artist_id, 'submitted', p_event_date, p_event_type,
-    v_trimmed_location, v_trimmed_reqs, p_indicative_budget, v_trimmed_msg
+    v_requester_id,
+    v_safe_requester_type,
+    p_artist_id,
+    'submitted',
+    p_event_date,
+    p_event_type,
+    v_trimmed_location,
+    v_trimmed_reqs,
+    p_indicative_budget,
+    v_trimmed_msg,
+    p_guest_count
   )
   RETURNING id INTO v_enquiry_id;
 
-  -- 14. Append audit history event
+  -- 15. Append audit history event
   INSERT INTO public.booking_enquiry_events (
     enquiry_id, actor_id, actor_role, action, notes
   ) VALUES (
@@ -378,15 +413,13 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.submit_booking_enquiry_v2(UUID, DATE, TEXT, TEXT, TEXT, NUMERIC, TEXT, TEXT) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.submit_booking_enquiry_v2(UUID, DATE, TEXT, TEXT, TEXT, NUMERIC, TEXT, TEXT) FROM anon;
-GRANT  EXECUTE ON FUNCTION public.submit_booking_enquiry_v2(UUID, DATE, TEXT, TEXT, TEXT, NUMERIC, TEXT, TEXT) TO authenticated;
+REVOKE ALL ON FUNCTION public.submit_booking_enquiry_v2(UUID, DATE, TEXT, TEXT, TEXT, NUMERIC, TEXT, TEXT, INTEGER) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.submit_booking_enquiry_v2(UUID, DATE, TEXT, TEXT, TEXT, NUMERIC, TEXT, TEXT, INTEGER) FROM anon;
+GRANT  EXECUTE ON FUNCTION public.submit_booking_enquiry_v2(UUID, DATE, TEXT, TEXT, TEXT, NUMERIC, TEXT, TEXT, INTEGER) TO authenticated;
 
 -- ============================================================
--- 7. RPC: public.withdraw_booking_enquiry_v2()
---
--- Security Definer: Authenticated Business OR Individual accounts.
--- Withdraws own enquiry by requester_id.
+-- 9. RPC: withdraw_booking_enquiry_v2()
+--    Permits withdrawal from: submitted, seen, info_requested, clarified, AND interested
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.withdraw_booking_enquiry_v2(
@@ -415,7 +448,7 @@ BEGIN
   FROM public.profiles
   WHERE id = v_requester_id;
 
-  IF v_requester_role NOT IN ('business', 'individual') THEN
+  IF v_requester_role IS NULL OR v_requester_role NOT IN ('business', 'individual') THEN
     RAISE EXCEPTION 'Access Denied: Only business or individual accounts can withdraw booking enquiries' USING ERRCODE = '42501';
   END IF;
 
@@ -428,12 +461,18 @@ BEGIN
     RAISE EXCEPTION 'Enquiry Not Found or Access Denied' USING ERRCODE = 'P0002';
   END IF;
 
+  -- Idempotent if already withdrawn
   IF v_current_status = 'withdrawn' THEN
-    RETURN; -- Idempotent
+    RETURN;
   END IF;
 
-  IF v_current_status NOT IN ('submitted', 'seen', 'info_requested', 'clarified') THEN
-    RAISE EXCEPTION 'Enquiry cannot be withdrawn: status is already concluded in "%"', v_current_status USING ERRCODE = '23514';
+  IF v_current_status = 'declined' THEN
+    RAISE EXCEPTION 'Enquiry cannot be withdrawn: enquiry was already declined by the artist' USING ERRCODE = '23514';
+  END IF;
+
+  -- Permitted from open statuses AND non-binding 'interested' status
+  IF v_current_status NOT IN ('submitted', 'seen', 'info_requested', 'clarified', 'interested') THEN
+    RAISE EXCEPTION 'Enquiry cannot be withdrawn: status is currently "%"', v_current_status USING ERRCODE = '23514';
   END IF;
 
   UPDATE public.booking_enquiries
@@ -454,10 +493,7 @@ REVOKE ALL ON FUNCTION public.withdraw_booking_enquiry_v2(UUID) FROM anon;
 GRANT  EXECUTE ON FUNCTION public.withdraw_booking_enquiry_v2(UUID) TO authenticated;
 
 -- ============================================================
--- 8. RPC: public.clarify_booking_enquiry_v2()
---
--- Security Definer: Authenticated Business OR Individual accounts.
--- Provides clarification to artist's info_requested query.
+-- 10. RPC: clarify_booking_enquiry_v2()
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.clarify_booking_enquiry_v2(
@@ -488,7 +524,7 @@ BEGIN
   FROM public.profiles
   WHERE id = v_requester_id;
 
-  IF v_requester_role NOT IN ('business', 'individual') THEN
+  IF v_requester_role IS NULL OR v_requester_role NOT IN ('business', 'individual') THEN
     RAISE EXCEPTION 'Access Denied: Only business or individual accounts can clarify booking enquiries' USING ERRCODE = '42501';
   END IF;
 
@@ -533,10 +569,9 @@ REVOKE ALL ON FUNCTION public.clarify_booking_enquiry_v2(UUID, TEXT) FROM anon;
 GRANT  EXECUTE ON FUNCTION public.clarify_booking_enquiry_v2(UUID, TEXT) TO authenticated;
 
 -- ============================================================
--- 9. RLS policies for Individual access
+-- 11. RLS Policies for Individual Isolation
 -- ============================================================
 
--- Individual can view own sent enquiries (by requester_id)
 DROP POLICY IF EXISTS "Individual can view own sent enquiries" ON public.booking_enquiries;
 CREATE POLICY "Individual can view own sent enquiries"
   ON public.booking_enquiries
@@ -544,7 +579,6 @@ CREATE POLICY "Individual can view own sent enquiries"
   TO authenticated
   USING (requester_id = auth.uid() AND requester_type = 'individual');
 
--- Individual can see own enquiry events
 DROP POLICY IF EXISTS "Individual can view own enquiry events" ON public.booking_enquiry_events;
 CREATE POLICY "Individual can view own enquiry events"
   ON public.booking_enquiry_events
@@ -560,7 +594,7 @@ CREATE POLICY "Individual can view own enquiry events"
   );
 
 -- ============================================================
--- 10. Performance indexes for requester_id queries
+-- 12. Performance & Quota Lookup Indexes
 -- ============================================================
 
 CREATE INDEX IF NOT EXISTS idx_booking_enquiries_requester_id
@@ -569,59 +603,65 @@ CREATE INDEX IF NOT EXISTS idx_booking_enquiries_requester_id
 CREATE INDEX IF NOT EXISTS idx_booking_enquiries_requester_type
   ON public.booking_enquiries (requester_type);
 
+-- Partial index for active pair enquiries by requester_id
+CREATE INDEX IF NOT EXISTS idx_booking_enquiries_open_pair_requester
+  ON public.booking_enquiries (requester_id, artist_id)
+  WHERE status IN ('submitted', 'seen', 'info_requested', 'clarified');
+
+-- Partial index for platform-wide open enquiries per requester
+CREATE INDEX IF NOT EXISTS idx_booking_enquiries_open_requester
+  ON public.booking_enquiries (requester_id)
+  WHERE status IN ('submitted', 'seen', 'info_requested', 'clarified');
+
 COMMIT;
 
 -- ==============================================================================
--- POST-MIGRATION VERIFICATION QUERIES (run after applying in SQL Editor)
+-- POST-MIGRATION VERIFICATION QUERIES (RUN IN SUPABASE SQL EDITOR AFTER EXECUTION)
 -- ==============================================================================
 --
--- 1. Confirm 'individual' in profiles CHECK:
---    SELECT conname, pg_get_constraintdef(oid)
---    FROM pg_constraint WHERE conrelid = 'public.profiles'::regclass AND conname = 'profiles_role_check';
+-- 1. Confirm business_id is nullable:
+--    SELECT column_name, is_nullable
+--    FROM information_schema.columns
+--    WHERE table_schema = 'public' AND table_name = 'booking_enquiries' AND column_name = 'business_id';
+--    -- Expected: YES
 --
--- 2. Confirm new columns on booking_enquiries:
+-- 2. Confirm requester columns and guest_count exist:
 --    SELECT column_name, data_type, is_nullable
 --    FROM information_schema.columns
 --    WHERE table_schema = 'public' AND table_name = 'booking_enquiries'
---    AND column_name IN ('requester_id', 'requester_type');
+--    AND column_name IN ('requester_id', 'requester_type', 'guest_count');
 --
--- 3. Confirm trigger exists:
---    SELECT tgname FROM pg_trigger WHERE tgrelid = 'public.booking_enquiries'::regclass
---    AND tgname = 'trg_populate_legacy_requester';
+-- 3. Confirm all historical business rows were backfilled:
+--    SELECT count(*) AS unbackfilled_count
+--    FROM public.booking_enquiries
+--    WHERE requester_id IS NULL OR requester_type IS NULL;
+--    -- Expected: 0
 --
--- 4. Confirm new RPCs exist:
---    SELECT proname FROM pg_proc
+-- 4. Confirm integrity constraint is active:
+--    SELECT conname, pg_get_constraintdef(oid)
+--    FROM pg_constraint
+--    WHERE conrelid = 'public.booking_enquiries'::regclass AND conname = 'booking_enquiries_requester_check';
+--
+-- 5. Confirm trigger exists:
+--    SELECT tgname FROM pg_trigger
+--    WHERE tgrelid = 'public.booking_enquiries'::regclass AND tgname = 'trg_populate_legacy_requester';
+--
+-- 6. Confirm v2 RPCs exist:
+--    SELECT proname, prosecdef, proconfig
+--    FROM pg_proc
 --    WHERE proname IN ('submit_booking_enquiry_v2', 'withdraw_booking_enquiry_v2', 'clarify_booking_enquiry_v2');
 --
--- 5. Confirm existing Business enquiries still work (backward compat test):
---    SELECT rpc_call_result FROM public.submit_booking_enquiry(
---      '<artist_id>', CURRENT_DATE + 2, 'private', NULL, NULL, NULL, NULL
---    );  -- (requires a Business-role session)
---
 -- ==============================================================================
--- ROLLBACK SCRIPT (IF REVERSAL IS EVER REQUIRED)
+-- NON-DESTRUCTIVE FORWARD RECOVERY PROCEDURE (IF DEACTIVATION EVER REQUIRED)
 -- ==============================================================================
 --
--- BEGIN;
--- DROP TRIGGER IF EXISTS trg_populate_legacy_requester ON public.booking_enquiries;
--- DROP FUNCTION IF EXISTS public.populate_legacy_requester();
--- DROP FUNCTION IF EXISTS public.clarify_booking_enquiry_v2(UUID, TEXT);
--- DROP FUNCTION IF EXISTS public.withdraw_booking_enquiry_v2(UUID);
--- DROP FUNCTION IF EXISTS public.submit_booking_enquiry_v2(UUID, DATE, TEXT, TEXT, TEXT, NUMERIC, TEXT, TEXT);
--- DROP POLICY IF EXISTS "Individual can view own enquiry events" ON public.booking_enquiry_events;
--- DROP POLICY IF EXISTS "Individual can view own sent enquiries" ON public.booking_enquiries;
--- ALTER TABLE public.booking_enquiry_events
---   DROP CONSTRAINT IF EXISTS booking_enquiry_events_actor_role_check;
--- ALTER TABLE public.booking_enquiry_events
---   ADD CONSTRAINT booking_enquiry_events_actor_role_check
---     CHECK (actor_role IN ('business', 'artist', 'admin'));
--- ALTER TABLE public.booking_enquiries
---   DROP COLUMN IF EXISTS requester_type,
---   DROP COLUMN IF EXISTS requester_id;
--- ALTER TABLE public.profiles
---   DROP CONSTRAINT IF EXISTS profiles_role_check;
--- ALTER TABLE public.profiles
---   ADD CONSTRAINT profiles_role_check CHECK (role IN ('artist', 'business', 'admin'));
--- -- Restore original handle_new_user() without 'individual' (re-run original migration or restore from backup)
--- COMMIT;
+-- DO NOT DROP COLUMNS OR RESTORE THE 3-ROLE CONSTRAINT IF REAL INDIVIDUAL ACCOUNTS EXIST.
+-- Dropping columns or shrinking the role check constraint would orphan or delete real user data.
+--
+-- To safely deactivate Individual bookings without data loss:
+-- 1. Revert client UI (disables individual signup tab and booking form).
+-- 2. Revoke execute on the v2 submission RPC:
+--    REVOKE EXECUTE ON FUNCTION public.submit_booking_enquiry_v2(UUID, DATE, TEXT, TEXT, TEXT, NUMERIC, TEXT, TEXT, INTEGER) FROM authenticated;
+-- 3. Legacy Business submissions via submit_booking_enquiry (v1) will continue functioning normally.
+-- 4. Existing Individual enquiries remain read-only accessible to their respective owners via RLS.
 -- ==============================================================================

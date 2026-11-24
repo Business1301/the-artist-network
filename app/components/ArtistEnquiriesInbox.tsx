@@ -494,6 +494,13 @@ export default function ArtistEnquiriesInbox({
                         </span>
                       )}
 
+                      {enquiry.guest_count && (
+                        <span className="flex items-center gap-1">
+                          <span>👥</span>
+                          <span>{enquiry.guest_count.toLocaleString("en-IN")} Guests</span>
+                        </span>
+                      )}
+
                       <span className="flex items-center gap-1 font-bold text-gray-800">
                         <span>💰</span>
                         <span>
@@ -532,6 +539,11 @@ export default function ArtistEnquiriesInbox({
                         <span className="text-[11px] font-black text-gray-500 uppercase tracking-wider block mb-1">
                           Performance &amp; Technical Requirements
                         </span>
+                        {enquiry.guest_count && (
+                          <div className="mb-2 text-xs font-semibold text-purple-700 bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-100 inline-block">
+                            👥 Expected Guests: {enquiry.guest_count.toLocaleString("en-IN")}
+                          </div>
+                        )}
                         <p className="text-xs sm:text-sm text-gray-800 whitespace-pre-line leading-relaxed">
                           {enquiry.requirements || "No specific technical requirements noted."}
                         </p>

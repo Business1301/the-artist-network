@@ -26,6 +26,7 @@ interface DbEnquiryRow {
   business_id: string;
   requester_id?: string | null;
   requester_type?: "business" | "individual" | null;
+  guest_count?: number | null;
   artist_id: string;
   status: BookingEnquiryStatus;
   event_date: string;
@@ -325,7 +326,11 @@ async function verifyArtistSession(
 async function verifyEnquiryPartySession(
   supabase: Awaited<ReturnType<typeof createClient>>
 ): Promise<
-  | { authorized: true; userId: string; role: "business" | "artist" | "admin" }
+  | {
+      authorized: true;
+      userId: string;
+      role: "business" | "artist" | "admin" | "individual";
+    }
   | { authorized: false; error: string }
 > {
   const {
@@ -398,7 +403,7 @@ export async function submitBookingEnquiryAction(
         : guestNote;
     }
 
-    // Attempt v2 RPC first (supports both Business and Individual)
+    // Attempt v2 RPC first (supports both Business and Individual with guest count)
     const { data: enquiryId, error } = await supabase.rpc(
       "submit_booking_enquiry_v2",
       {
@@ -410,6 +415,7 @@ export async function submitBookingEnquiryAction(
         p_indicative_budget: parsed.data.indicativeBudget ?? null,
         p_message: messageText,
         p_requester_type: session.role,
+        p_guest_count: parsed.data.numberOfGuests ?? null,
       }
     );
 
@@ -902,6 +908,9 @@ export async function getBusinessEnquiriesAction(
     const results: BookingEnquiryWithDetails[] = rows.map((row) => ({
       id: row.id,
       business_id: row.business_id,
+      requester_id: row.requester_id || row.business_id,
+      requester_type: row.requester_type || "business",
+      guest_count: row.guest_count ?? null,
       artist_id: row.artist_id,
       status: row.status,
       event_date: row.event_date,
@@ -1028,6 +1037,7 @@ export async function getClientEnquiriesAction(
       business_id: row.business_id,
       requester_id: row.requester_id || session.userId,
       requester_type: row.requester_type || "individual",
+      guest_count: row.guest_count ?? null,
       artist_id: row.artist_id,
       status: row.status,
       event_date: row.event_date,
@@ -1155,6 +1165,7 @@ export async function getArtistEnquiriesAction(
         business_id: row.business_id,
         requester_id: row.requester_id || row.business_id,
         requester_type: reqType,
+        guest_count: row.guest_count ?? null,
         artist_id: row.artist_id,
         status: row.status,
         event_date: row.event_date,
@@ -1276,6 +1287,8 @@ export async function getEnquiryDetailsAction(
     // Apply strict ownership filtering unless platform admin
     if (session.role === "business") {
       query = query.eq("business_id", session.userId);
+    } else if (session.role === "individual") {
+      query = query.eq("requester_id", session.userId);
     } else if (session.role === "artist") {
       query = query.eq("artist_id", session.userId);
     }
@@ -1290,9 +1303,15 @@ export async function getEnquiryDetailsAction(
     }
 
     const row = data as unknown as DbEnquiryRow;
+    const reqType =
+      row.requester_type ||
+      (row.profiles?.role === "individual" ? "individual" : "business");
     const result: BookingEnquiryWithDetails = {
       id: row.id,
       business_id: row.business_id,
+      requester_id: row.requester_id || row.business_id,
+      requester_type: reqType,
+      guest_count: row.guest_count ?? null,
       artist_id: row.artist_id,
       status: row.status,
       event_date: row.event_date,

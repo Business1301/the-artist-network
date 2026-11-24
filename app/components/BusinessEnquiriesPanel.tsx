@@ -7,8 +7,8 @@ import {
   BookingEnquiryStatus,
   BookingEventType,
   isPastEventDate,
-  isOpenStatus,
   isTerminalStatus,
+  canWithdrawStatus,
 } from "@/lib/enquiries/types";
 import {
   getBusinessEnquiriesAction,
@@ -348,10 +348,9 @@ export default function BusinessEnquiriesPanel({
               const isExpanded = expandedId === enq.id;
               const badge = getStatusBadge(enq.status);
               const isPast = isPastEventDate(enq.event_date);
-              const isOpen = isOpenStatus(enq.status);
               const isTerminal = isTerminalStatus(enq.status);
               const canClarify = enq.status === "info_requested";
-              const canWithdraw = isOpen;
+              const canWithdraw = canWithdrawStatus(enq.status);
               const artistName =
                 enq.artist_profile?.stage_name || "Artist";
               const artistSlug = enq.artist_profile?.slug;
@@ -408,6 +407,7 @@ export default function BusinessEnquiriesPanel({
                         <strong>Event:</strong> {EVENT_TYPE_LABELS[enq.event_type]} ·{" "}
                         <strong>{eventDateFormatted}</strong>
                         {enq.event_location && ` · ${enq.event_location}`}
+                        {enq.guest_count && ` · 👥 ${enq.guest_count.toLocaleString("en-IN")} guests`}
                       </p>
                       {enq.indicative_budget && (
                         <p className="text-xs text-gray-600">

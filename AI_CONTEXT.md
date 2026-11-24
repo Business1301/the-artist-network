@@ -2032,37 +2032,40 @@ Four platform roles are now fully supported:
 - `individual` (`/dashboard/client`)
 - `admin` (`/admin`)
 
-### 27.2 Implemented Architectural Components
+### 27.2 Implemented Architectural Components & Database Compatibility Corrections
 1. **Database Migration File Prepared (Review-Only):**
    - File: `supabase/migrations/20261125000000_individual_booking.sql`
-   - `profiles_role_check` updated to include `'individual'`.
-   - `handle_new_user()` updated to allow `'individual'` signup metadata.
-   - Additive nullable `requester_id` (UUID FK to profiles) and `requester_type` (`'business' | 'individual'`) on `public.booking_enquiries`.
-   - BEFORE INSERT legacy trigger `trg_populate_legacy_requester` populates `requester_id = business_id` and `requester_type = 'business'` for calls via the original 7-arg Business RPC.
-   - Versioned RPCs created: `submit_booking_enquiry_v2`, `withdraw_booking_enquiry_v2`, `clarify_booking_enquiry_v2`.
-   - Anti-spam advisory locks (`tan_enq_req:<id>` and `tan_enq_pair:<id>:<artist>`) with max 3 open per pair, max 10 open platform-wide, and max 5/hour rate limits.
-   - Dedicated RLS policies for individual enquiry and event isolation.
+   - **Task 1: business_id nullability & requester constraint**: Safely executed `ALTER COLUMN business_id DROP NOT NULL`. Added `booking_enquiries_requester_check` constraint enforcing exact business vs individual field correlations (Business: `business_id IS NOT NULL AND requester_id = business_id`; Individual: `business_id IS NULL AND requester_id IS NOT NULL`).
+   - **Task 2: Shared concurrency protection**: Unified advisory lock key namespace to `'tan_enq_biz:' || v_requester_id::text` between v1 and v2, preventing lock hash collision/fragmentation between concurrent submissions.
+   - **Task 3: Idempotent backfill**: Added idempotent historical backfill `UPDATE public.booking_enquiries SET requester_id = business_id, requester_type = 'business' WHERE requester_id IS NULL AND business_id IS NOT NULL;`.
+   - **Task 4: Guest count persistence**: Added `guest_count INTEGER CHECK (guest_count IS NULL OR (guest_count > 0 AND guest_count <= 100000))` column. Added `p_guest_count INTEGER DEFAULT NULL` parameter to `submit_booking_enquiry_v2`. Traced and persisted end-to-end through Zod validation, RPC call, server action mappings, and UI presentation.
+   - **Task 5: Foreign key cascade & forward recovery**: Aligned `requester_id` foreign key on `ON DELETE CASCADE` matching `business_id` to eliminate constraint violations upon user deletion. Replaced destructive column drops with safe non-destructive forward recovery procedure.
+   - **Task 6: Standardized withdrawal**: Updated `withdraw_booking_enquiry_v2` and exported `canWithdrawStatus` helper permitting withdrawal from both open states and non-binding `'interested'` state, blocking only if `'declined'` or already `'withdrawn'`.
+   - **Task 7: Security hardening**: Enforced `SECURITY DEFINER SET search_path = ''` on `handle_new_user()` auth trigger and all versioned RPCs. Explicitly verified caller role against `public.profiles.role` (fail-closed, never trust metadata). Revoked execute from PUBLIC and anon.
 2. **Server-Side Auth Guard:**
    - File: `lib/auth/client.ts` (`requireClient()`) verifies user session and queries `public.profiles.role === 'individual'`.
    - `lib/auth/redirect.ts`: maps `individual` to `/dashboard/client`.
    - Cross-role guards updated in `requireBusiness()`, `requireArtist()`, and `requireAdmin()`.
 3. **Client Dashboard:**
    - Files: `app/dashboard/client/layout.tsx` (server guard) and `app/dashboard/client/page.tsx` (client view).
-   - Features: Sent enquiry list, status metrics, clarification reply dialog, withdrawal confirmation, and prominent non-binding legal notices.
+   - Features: Sent enquiry list, guest count display, status metrics, clarification reply dialog, withdrawal confirmation via `canWithdrawStatus`, and prominent non-binding legal notices.
 4. **Shared Booking Enquiry Form:**
    - File: `app/components/BookingEnquirySection.tsx` updated with optional `numberOfGuests` input, custom messages, and direct links for both Individual and Business users.
 5. **Artist Inbox Integration:**
-   - File: `app/components/ArtistEnquiriesInbox.tsx` displays distinct badges (`👤 Individual Client` vs `🏢 Business / Venue`) for every incoming enquiry.
-6. **Role-Aware Navigation:**
+   - File: `app/components/ArtistEnquiriesInbox.tsx` displays distinct badges (`👤 Individual Client` vs `🏢 Business / Venue`) and guest count chip (`👥 {guest_count} Guests`) for incoming enquiries.
+6. **Business Enquiries Panel:**
+   - File: `app/components/BusinessEnquiriesPanel.tsx` updated with `canWithdrawStatus` and guest count display.
+7. **Role-Aware Navigation:**
    - `Navbar.tsx` and `Footer.tsx` updated with `👤 My Enquiries` link, custom styling, and mobile drawer support.
 
 ### 27.3 Verification & Quality Gates
 - `npx tsc --noEmit`: 0 errors.
-- `npm run lint`: 0 errors.
+- `npm run lint`: 0 errors (0 new warnings; 78 pre-existing warnings in `<img>` and legacy scratch scripts).
 - `npm run build`: 23/23 routes clean (Exit 0).
 - `npm audit --omit=dev`: 0 vulnerabilities.
-- Automated Test Suite (`scratch/test_phase_52b_individual.mjs`): 37 PASS, 0 FAIL, 5 BLOCKED (pending production SQL migration).
-- Local Git Commit: `45c292e`.
+- Automated Test Suite (`scratch/test_phase_52b_individual.mjs`): **53 PASSED, 0 FAILED, 16 BLOCKED**.
+- **Task 8 Database Integration Tests**: 16 integration tests marked as **BLOCKED** due to no isolated test database being available; execution against production is strictly prohibited.
+- Local Git Commits: `45c292e`, `1b3ec32`.
 
 
 

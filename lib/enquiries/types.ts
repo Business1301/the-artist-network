@@ -61,6 +61,7 @@ export interface BookingEnquiry {
   requirements: string | null;
   indicative_budget: number | null; // Always denominated in INR, non-binding
   number_of_guests?: number | null;
+  guest_count?: number | null;
   business_message: string | null;
   artist_response: string | null;
   business_clarification: string | null;
@@ -148,6 +149,16 @@ export interface EnquiryListFilter {
   status?: EnquiryStatusFilter;
   limit?: number;
   offset?: number;
+}
+
+/**
+ * Helper: Check whether an enquiry can be withdrawn by requester.
+ * Standardized across business and individual roles.
+ * Allowed in: submitted, seen, info_requested, clarified, interested.
+ * Blocked in: declined, withdrawn.
+ */
+export function canWithdrawStatus(status: BookingEnquiryStatus): boolean {
+  return status !== "declined" && status !== "withdrawn";
 }
 
 /**
