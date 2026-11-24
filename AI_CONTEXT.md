@@ -2019,6 +2019,52 @@ All six admin moderation server actions now revalidate:
 - **NO SQL executed, no database schema changes, no live artist records modified.**
 - **Admin verification controls accessible only to authenticated admin sessions (SSR auth guard confirmed: unauthenticated visitors receive login redirect).**
 
+---
+
+## 27. Phase 5.2B — Individual Booking Accounts & Enquiries (Local Implementation)
+
+### 27.1 Overview
+Implemented local architecture, components, and UI to allow ordinary individuals to create accounts and send structured non-binding booking enquiries to published artists without registering as businesses or venues.
+
+Four platform roles are now fully supported:
+- `artist` (`/dashboard/artist`)
+- `business` (`/dashboard/restaurant`)
+- `individual` (`/dashboard/client`)
+- `admin` (`/admin`)
+
+### 27.2 Implemented Architectural Components
+1. **Database Migration File Prepared (Review-Only):**
+   - File: `supabase/migrations/20261125000000_individual_booking.sql`
+   - `profiles_role_check` updated to include `'individual'`.
+   - `handle_new_user()` updated to allow `'individual'` signup metadata.
+   - Additive nullable `requester_id` (UUID FK to profiles) and `requester_type` (`'business' | 'individual'`) on `public.booking_enquiries`.
+   - BEFORE INSERT legacy trigger `trg_populate_legacy_requester` populates `requester_id = business_id` and `requester_type = 'business'` for calls via the original 7-arg Business RPC.
+   - Versioned RPCs created: `submit_booking_enquiry_v2`, `withdraw_booking_enquiry_v2`, `clarify_booking_enquiry_v2`.
+   - Anti-spam advisory locks (`tan_enq_req:<id>` and `tan_enq_pair:<id>:<artist>`) with max 3 open per pair, max 10 open platform-wide, and max 5/hour rate limits.
+   - Dedicated RLS policies for individual enquiry and event isolation.
+2. **Server-Side Auth Guard:**
+   - File: `lib/auth/client.ts` (`requireClient()`) verifies user session and queries `public.profiles.role === 'individual'`.
+   - `lib/auth/redirect.ts`: maps `individual` to `/dashboard/client`.
+   - Cross-role guards updated in `requireBusiness()`, `requireArtist()`, and `requireAdmin()`.
+3. **Client Dashboard:**
+   - Files: `app/dashboard/client/layout.tsx` (server guard) and `app/dashboard/client/page.tsx` (client view).
+   - Features: Sent enquiry list, status metrics, clarification reply dialog, withdrawal confirmation, and prominent non-binding legal notices.
+4. **Shared Booking Enquiry Form:**
+   - File: `app/components/BookingEnquirySection.tsx` updated with optional `numberOfGuests` input, custom messages, and direct links for both Individual and Business users.
+5. **Artist Inbox Integration:**
+   - File: `app/components/ArtistEnquiriesInbox.tsx` displays distinct badges (`👤 Individual Client` vs `🏢 Business / Venue`) for every incoming enquiry.
+6. **Role-Aware Navigation:**
+   - `Navbar.tsx` and `Footer.tsx` updated with `👤 My Enquiries` link, custom styling, and mobile drawer support.
+
+### 27.3 Verification & Quality Gates
+- `npx tsc --noEmit`: 0 errors.
+- `npm run lint`: 0 errors.
+- `npm run build`: 23/23 routes clean (Exit 0).
+- `npm audit --omit=dev`: 0 vulnerabilities.
+- Automated Test Suite (`scratch/test_phase_52b_individual.mjs`): 37 PASS, 0 FAIL, 5 BLOCKED (pending production SQL migration).
+- Local Git Commit: `45c292e`.
+
+
 
 
 
