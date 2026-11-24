@@ -1566,9 +1566,10 @@ A security vulnerability in Next.js (GHSA-mfr8-8qww-v76h) required patching on t
 2. **Contact & Privacy Placeholder Transparency (`app/contact/page.tsx` & `app/privacy/page.tsx`):**
    - Labeled all email channels and entity details as non-operational during the pre-launch testing preview, preventing visitors from mistaking placeholders for active communication channels.
    - Calibrated statutory compliance statements: explained that policies reflect statutory alignment with the DPDP Act 2023 and IT Act 2000, and that official Grievance Officer and corporate entity details will be designated and published prior to commercial launch.
-3. **Rollback Plan Correction:**
-   - Prohibited all force-pushing and history rewriting.
-   - Established primary rollback via Netlify Deploy UI (republishing verified deploy `7f1810e`) and secondary source rollback via reviewed forward-moving Git revert commits.
+3. **Rollback Plan Architecture & Safeguards:**
+   - Prohibited all force-pushing, history rewriting, and generic revert ranges over merge history.
+   - **Primary Emergency Recovery:** Netlify Dashboard 1-click redeploy of known-good baseline `7f1810e`.
+   - **Secondary Source Rollback Protocol:** Reviewed dedicated branch (`rollback/restore-7f1810e`), restoring the exact baseline tree via `git restore --source=7f1810e --staged --worktree -- .`, confirming clean tree match with `git diff 7f1810e`, passing all local verification gates, and committing a single forward-moving revert commit.
 
 
 
