@@ -7,7 +7,7 @@ import { getSafeRedirectPath } from "@/lib/auth/redirect";
 export interface CurrentUser {
   id: string;
   email?: string;
-  role: "admin" | "artist" | "business" | string;
+  role: "admin" | "artist" | "business" | "individual" | string;
   fullName: string;
 }
 
@@ -25,7 +25,7 @@ export interface AuthResponse {
 export async function signUpAction(formData: {
   email: string;
   password: string;
-  role: "artist" | "business";
+  role: "artist" | "business" | "individual";
   fullName?: string;
   contactName?: string;
   businessName?: string;
@@ -40,10 +40,10 @@ export async function signUpAction(formData: {
 
   const { email, password, role, fullName, contactName, businessName } = formData;
 
-  if (role !== "artist" && role !== "business") {
+  if (role !== "artist" && role !== "business" && role !== "individual") {
     return {
       success: false,
-      message: "Invalid account role. Registration is only permitted for artists and businesses.",
+      message: "Invalid account role. Registration is only permitted for artists, businesses, and individuals.",
     };
   }
 
@@ -61,7 +61,7 @@ export async function signUpAction(formData: {
     role,
   };
 
-  if (role === "artist") {
+  if (role === "artist" || role === "individual") {
     metaData.full_name = fullName || "";
   } else {
     metaData.contact_name = contactName || "";
@@ -101,7 +101,12 @@ export async function signUpAction(formData: {
 
   return {
     success: true,
-    redirectTo: role === "business" ? "/dashboard/restaurant" : "/dashboard/artist",
+    redirectTo:
+      role === "business"
+        ? "/dashboard/restaurant"
+        : role === "individual"
+        ? "/dashboard/client"
+        : "/dashboard/artist",
     message: "Registration completed successfully!",
     user: data.user
       ? {
@@ -264,7 +269,7 @@ export async function signOutAction(): Promise<AuthResponse> {
 export interface CurrentUser {
   id: string;
   email?: string;
-  role: "admin" | "artist" | "business" | string;
+  role: "admin" | "artist" | "business" | "individual" | string;
   fullName: string;
 }
 

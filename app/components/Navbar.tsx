@@ -112,6 +112,8 @@ export default function Navbar({ initialUser }: NavbarProps) {
         return { href: "/admin", label: "Admin Dashboard", badge: "🛡️" };
       case "business":
         return { href: "/dashboard/restaurant", label: "Business Dashboard", badge: "🏢" };
+      case "individual":
+        return { href: "/dashboard/client", label: "My Enquiries", badge: "👤" };
       default:
         return { href: "/dashboard/artist", label: "Artist Dashboard", badge: "🎨" };
     }
@@ -164,6 +166,8 @@ export default function Navbar({ initialUser }: NavbarProps) {
                       ? "bg-purple-600 hover:bg-purple-700"
                       : user.role === "business"
                       ? "bg-emerald-600 hover:bg-emerald-700"
+                      : user.role === "individual"
+                      ? "bg-indigo-600 hover:bg-indigo-700"
                       : "bg-blue-600 hover:bg-blue-700"
                   }`}
                 >
@@ -264,6 +268,8 @@ export default function Navbar({ initialUser }: NavbarProps) {
                       ? "bg-purple-600 hover:bg-purple-700"
                       : user.role === "business"
                       ? "bg-emerald-600 hover:bg-emerald-700"
+                      : user.role === "individual"
+                      ? "bg-indigo-600 hover:bg-indigo-700"
                       : "bg-blue-600 hover:bg-blue-700"
                   }`}
                 >
@@ -287,6 +293,13 @@ export default function Navbar({ initialUser }: NavbarProps) {
                   className="w-full text-center py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-800 hover:bg-gray-50 transition-colors"
                 >
                   Sign In
+                </Link>
+                <Link
+                  href="/signup?role=individual"
+                  onClick={() => setMenuOpen(false)}
+                  className="w-full text-center py-2.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 text-sm font-bold shadow-xs transition-colors"
+                >
+                  Join as Individual
                 </Link>
                 <Link
                   href="/signup?role=business"

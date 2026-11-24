@@ -24,6 +24,8 @@ import {
 interface DbEnquiryRow {
   id: string;
   business_id: string;
+  requester_id?: string | null;
+  requester_type?: "business" | "individual" | null;
   artist_id: string;
   status: BookingEnquiryStatus;
   event_date: string;
@@ -51,7 +53,7 @@ interface DbEnquiryRow {
   profiles?: {
     id: string;
     full_name: string | null;
-    role: "business";
+    role: "business" | "individual";
   } | null;
   booking_enquiry_events?: BookingEnquiryEvent[];
 }
@@ -161,6 +163,113 @@ async function verifyBusinessSession(
 }
 
 /**
+ * Verify client (individual) session and database role in public.profiles
+ * Fails closed on missing session, invalid role, or database read error.
+ */
+async function verifyClientSession(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<
+  | { authorized: true; userId: string; fullName: string }
+  | { authorized: false; error: string }
+> {
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return {
+      authorized: false,
+      error: "Authentication required. Please log in as an individual account.",
+    };
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role, full_name")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || !profile) {
+    return {
+      authorized: false,
+      error: "User profile not found. Please contact support.",
+    };
+  }
+
+  if (profile.role !== "individual") {
+    return {
+      authorized: false,
+      error:
+        "Access denied. Only registered individual accounts can perform this action.",
+    };
+  }
+
+  return {
+    authorized: true,
+    userId: user.id,
+    fullName: profile.full_name || "Client",
+  };
+}
+
+/**
+ * Verify requester (business or individual) session and database role
+ */
+async function verifyRequesterSession(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<
+  | {
+      authorized: true;
+      userId: string;
+      fullName: string;
+      role: "business" | "individual";
+    }
+  | { authorized: false; error: string }
+> {
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return {
+      authorized: false,
+      error: "Authentication required. Please log in to continue.",
+    };
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role, full_name")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || !profile) {
+    return {
+      authorized: false,
+      error: "User profile not found. Please contact support.",
+    };
+  }
+
+  if (profile.role !== "business" && profile.role !== "individual") {
+    return {
+      authorized: false,
+      error:
+        "Access denied. Only business or individual accounts can perform this action.",
+    };
+  }
+
+  return {
+    authorized: true,
+    userId: user.id,
+    fullName:
+      profile.full_name ||
+      (profile.role === "business" ? "Business Client" : "Individual Client"),
+    role: profile.role,
+  };
+}
+
+/**
  * Verify artist session and database role in public.profiles
  * Fails closed on missing session, invalid role, or database read error.
  */
@@ -239,7 +348,12 @@ async function verifyEnquiryPartySession(
   }
 
   const role = profile.role;
-  if (role !== "business" && role !== "artist" && role !== "admin") {
+  if (
+    role !== "business" &&
+    role !== "artist" &&
+    role !== "admin" &&
+    role !== "individual"
+  ) {
     return { authorized: false, error: "Access denied." };
   }
 
@@ -247,13 +361,14 @@ async function verifyEnquiryPartySession(
 }
 
 // ==============================================================================
-// 1. Submit Booking Enquiry (Business Role)
+// 1. Submit Booking Enquiry (Business or Individual Role)
 // ==============================================================================
 
 /**
  * Submit a new booking enquiry to a published artist.
  * Validates inputs with Zod, checks session role server-side,
- * and calls the atomic SECURITY DEFINER RPC `submit_booking_enquiry`.
+ * and calls the atomic SECURITY DEFINER RPC `submit_booking_enquiry_v2`
+ * (with fallback to `submit_booking_enquiry` for business if v2 is pending migration).
  */
 export async function submitBookingEnquiryAction(
   rawInput: SubmitEnquiryInput
@@ -268,33 +383,89 @@ export async function submitBookingEnquiryAction(
   }
 
   const supabase = await createClient();
-  const session = await verifyBusinessSession(supabase);
+  const session = await verifyRequesterSession(supabase);
   if (!session.authorized) {
     return { success: false, error: session.error };
   }
 
   try {
+    const messageText = parsed.data.businessMessage || parsed.data.message || null;
+    let requirementsText = parsed.data.requirements || null;
+    if (parsed.data.numberOfGuests) {
+      const guestNote = `Expected Guests: ${parsed.data.numberOfGuests}`;
+      requirementsText = requirementsText
+        ? `${guestNote}\n${requirementsText}`
+        : guestNote;
+    }
+
+    // Attempt v2 RPC first (supports both Business and Individual)
     const { data: enquiryId, error } = await supabase.rpc(
-      "submit_booking_enquiry",
+      "submit_booking_enquiry_v2",
       {
         p_artist_id: parsed.data.artistId,
         p_event_date: parsed.data.eventDate,
         p_event_type: parsed.data.eventType,
         p_event_location: parsed.data.eventLocation ?? null,
-        p_requirements: parsed.data.requirements ?? null,
+        p_requirements: requirementsText,
         p_indicative_budget: parsed.data.indicativeBudget ?? null,
-        p_business_message: parsed.data.businessMessage ?? null,
+        p_message: messageText,
+        p_requester_type: session.role,
       }
     );
 
     if (error) {
+      // If v2 function doesn't exist yet on database (prior to Phase 5.2B migration rollout)
+      const isMissingV2 =
+        error.code === "42883" ||
+        error.message?.includes("submit_booking_enquiry_v2");
+
+      if (isMissingV2) {
+        if (session.role === "business") {
+          // Graceful backward compatibility: fallback to 7-argument v1 RPC for business
+          const { data: v1EnquiryId, error: v1Error } = await supabase.rpc(
+            "submit_booking_enquiry",
+            {
+              p_artist_id: parsed.data.artistId,
+              p_event_date: parsed.data.eventDate,
+              p_event_type: parsed.data.eventType,
+              p_event_location: parsed.data.eventLocation ?? null,
+              p_requirements: requirementsText,
+              p_indicative_budget: parsed.data.indicativeBudget ?? null,
+              p_business_message: messageText,
+            }
+          );
+
+          if (v1Error) {
+            return {
+              success: false,
+              error: parseRpcError(v1Error, "Failed to submit booking enquiry."),
+            };
+          }
+
+          revalidatePath("/dashboard/restaurant");
+          return {
+            success: true,
+            data: { enquiryId: v1EnquiryId as string },
+          };
+        } else {
+          // Individual user on unmigrated database
+          return {
+            success: false,
+            error:
+              "Individual enquiry submissions will be activated upon owner database migration rollout.",
+          };
+        }
+      }
+
       return {
         success: false,
         error: parseRpcError(error, "Failed to submit booking enquiry."),
       };
     }
 
-    revalidatePath("/dashboard/restaurant");
+    revalidatePath(
+      session.role === "business" ? "/dashboard/restaurant" : "/dashboard/client"
+    );
     return {
       success: true,
       data: { enquiryId: enquiryId as string },
@@ -521,11 +692,11 @@ export async function requestInfoAction(
 }
 
 // ==============================================================================
-// 6. Clarify Enquiry (Business Role)
+// 6. Clarify Enquiry (Business or Individual Role)
 // ==============================================================================
 
 /**
- * Submit the single business clarification in response to an artist's question.
+ * Submit clarification in response to an artist's question.
  * Transitions from 'info_requested' -> 'clarified'.
  */
 export async function clarifyEnquiryAction(
@@ -541,25 +712,47 @@ export async function clarifyEnquiryAction(
   }
 
   const supabase = await createClient();
-  const session = await verifyBusinessSession(supabase);
+  const session = await verifyRequesterSession(supabase);
   if (!session.authorized) {
     return { success: false, error: session.error };
   }
 
   try {
-    const { error } = await supabase.rpc("clarify_booking_enquiry", {
+    // Attempt v2 RPC first
+    const { error } = await supabase.rpc("clarify_booking_enquiry_v2", {
       p_enquiry_id: parsed.data.enquiryId,
       p_clarification: parsed.data.clarification,
     });
 
     if (error) {
-      return {
-        success: false,
-        error: parseRpcError(error, "Failed to submit clarification."),
-      };
+      const isMissingV2 =
+        error.code === "42883" ||
+        error.message?.includes("clarify_booking_enquiry_v2");
+
+      if (isMissingV2 && session.role === "business") {
+        // Fallback for business on v1 schema
+        const { error: v1Error } = await supabase.rpc("clarify_booking_enquiry", {
+          p_enquiry_id: parsed.data.enquiryId,
+          p_clarification: parsed.data.clarification,
+        });
+
+        if (v1Error) {
+          return {
+            success: false,
+            error: parseRpcError(v1Error, "Failed to submit clarification."),
+          };
+        }
+      } else {
+        return {
+          success: false,
+          error: parseRpcError(error, "Failed to submit clarification."),
+        };
+      }
     }
 
-    revalidatePath("/dashboard/restaurant");
+    revalidatePath(
+      session.role === "business" ? "/dashboard/restaurant" : "/dashboard/client"
+    );
     return { success: true };
   } catch (err: unknown) {
     const message =
@@ -569,7 +762,7 @@ export async function clarifyEnquiryAction(
 }
 
 // ==============================================================================
-// 7. Withdraw Enquiry (Business Role)
+// 7. Withdraw Enquiry (Business or Individual Role)
 // ==============================================================================
 
 /**
@@ -589,24 +782,45 @@ export async function withdrawEnquiryAction(
   }
 
   const supabase = await createClient();
-  const session = await verifyBusinessSession(supabase);
+  const session = await verifyRequesterSession(supabase);
   if (!session.authorized) {
     return { success: false, error: session.error };
   }
 
   try {
-    const { error } = await supabase.rpc("withdraw_booking_enquiry", {
+    // Attempt v2 RPC first
+    const { error } = await supabase.rpc("withdraw_booking_enquiry_v2", {
       p_enquiry_id: parsed.data.enquiryId,
     });
 
     if (error) {
-      return {
-        success: false,
-        error: parseRpcError(error, "Failed to withdraw enquiry."),
-      };
+      const isMissingV2 =
+        error.code === "42883" ||
+        error.message?.includes("withdraw_booking_enquiry_v2");
+
+      if (isMissingV2 && session.role === "business") {
+        // Fallback for business on v1 schema
+        const { error: v1Error } = await supabase.rpc("withdraw_booking_enquiry", {
+          p_enquiry_id: parsed.data.enquiryId,
+        });
+
+        if (v1Error) {
+          return {
+            success: false,
+            error: parseRpcError(v1Error, "Failed to withdraw enquiry."),
+          };
+        }
+      } else {
+        return {
+          success: false,
+          error: parseRpcError(error, "Failed to withdraw enquiry."),
+        };
+      }
     }
 
-    revalidatePath("/dashboard/restaurant");
+    revalidatePath(
+      session.role === "business" ? "/dashboard/restaurant" : "/dashboard/client"
+    );
     return { success: true };
   } catch (err: unknown) {
     const message =
@@ -737,6 +951,132 @@ export async function getBusinessEnquiriesAction(
 }
 
 // ==============================================================================
+// 8B. Retrieve Individual Client Enquiries (Sent Enquiries)
+// ==============================================================================
+
+/**
+ * Retrieve sent booking enquiries for the authenticated individual client.
+ * Filterable by 'all', 'open', 'terminal', or specific status.
+ * Enforces RLS and joins artist public profile details and audit history.
+ */
+export async function getClientEnquiriesAction(
+  filter?: EnquiryListFilter
+): Promise<EnquiryActionResult<BookingEnquiryWithDetails[]>> {
+  const parsedFilter = enquiryListFilterSchema.safeParse(filter || {});
+  if (!parsedFilter.success) {
+    return {
+      success: false,
+      error: "Invalid query filters.",
+      validationErrors: formatZodErrors(parsedFilter.error),
+    };
+  }
+
+  const { status, limit, offset } = parsedFilter.data;
+  const supabase = await createClient();
+  const session = await verifyClientSession(supabase);
+  if (!session.authorized) {
+    return { success: false, error: session.error };
+  }
+
+  try {
+    let query = supabase
+      .from("booking_enquiries")
+      .select(
+        `
+        *,
+        artist_profiles (
+          id, stage_name, slug, category, city, profile_image_url, is_verified
+        ),
+        booking_enquiry_events (
+          id, enquiry_id, actor_id, actor_role, action, notes, created_at
+        )
+      `
+      )
+      .eq("requester_id", session.userId)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (status === "open") {
+      query = query.in("status", [
+        "submitted",
+        "seen",
+        "info_requested",
+        "clarified",
+      ]);
+    } else if (status === "terminal") {
+      query = query.in("status", ["interested", "declined", "withdrawn"]);
+    } else if (status && status !== "all") {
+      query = query.eq("status", status);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      // If requester_id column does not exist yet (prior to database migration)
+      if (error.message?.includes("requester_id")) {
+        return { success: true, data: [] };
+      }
+      return {
+        success: false,
+        error: "Failed to load enquiries. Please try again.",
+      };
+    }
+
+    const rows = (data || []) as unknown as DbEnquiryRow[];
+    const results: BookingEnquiryWithDetails[] = rows.map((row) => ({
+      id: row.id,
+      business_id: row.business_id,
+      requester_id: row.requester_id || session.userId,
+      requester_type: row.requester_type || "individual",
+      artist_id: row.artist_id,
+      status: row.status,
+      event_date: row.event_date,
+      event_type: row.event_type,
+      event_location: row.event_location,
+      requirements: row.requirements,
+      indicative_budget:
+        row.indicative_budget !== null
+          ? typeof row.indicative_budget === "number"
+            ? row.indicative_budget
+            : parseFloat(row.indicative_budget)
+          : null,
+      business_message: row.business_message,
+      artist_response: row.artist_response,
+      business_clarification: row.business_clarification,
+      seen_at: row.seen_at,
+      responded_at: row.responded_at,
+      clarified_at: row.clarified_at,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      artist_profile: row.artist_profiles
+        ? {
+            id: row.artist_profiles.id,
+            stage_name: row.artist_profiles.stage_name,
+            slug: row.artist_profiles.slug,
+            category: row.artist_profiles.category,
+            city: row.artist_profiles.city,
+            profile_image_url: row.artist_profiles.profile_image_url,
+            is_verified: row.artist_profiles.is_verified,
+          }
+        : null,
+      events: (row.booking_enquiry_events || []).sort(
+        (a: BookingEnquiryEvent, b: BookingEnquiryEvent) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      ),
+    }));
+
+    return {
+      success: true,
+      data: results,
+    };
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error ? err.message : "An unexpected error occurred.";
+    return { success: false, error: message };
+  }
+}
+
+// ==============================================================================
 // 9. Retrieve Artist Enquiries (Received Enquiries)
 // ==============================================================================
 
@@ -806,45 +1146,77 @@ export async function getArtistEnquiriesAction(
 
     // Map nested relational data to clean strongly-typed model
     const rows = (data || []) as unknown as DbEnquiryRow[];
-    const results: BookingEnquiryWithDetails[] = rows.map((row) => ({
-      id: row.id,
-      business_id: row.business_id,
-      artist_id: row.artist_id,
-      status: row.status,
-      event_date: row.event_date,
-      event_type: row.event_type,
-      event_location: row.event_location,
-      requirements: row.requirements,
-      indicative_budget:
-        row.indicative_budget !== null
-          ? typeof row.indicative_budget === "number"
-            ? row.indicative_budget
-            : parseFloat(row.indicative_budget)
-          : null,
-      business_message: row.business_message,
-      artist_response: row.artist_response,
-      business_clarification: row.business_clarification,
-      seen_at: row.seen_at,
-      responded_at: row.responded_at,
-      clarified_at: row.clarified_at,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-      business_profile: row.profiles
-        ? {
-            id: row.profiles.id,
-            full_name: row.profiles.full_name || "Business",
-            role: row.profiles.role,
-          }
-        : {
-            id: row.business_id,
-            full_name: "Business Client",
-            role: "business" as const,
-          },
-      events: (row.booking_enquiry_events || []).sort(
-        (a: BookingEnquiryEvent, b: BookingEnquiryEvent) =>
-          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      ),
-    }));
+    const results: BookingEnquiryWithDetails[] = rows.map((row) => {
+      const reqType =
+        row.requester_type ||
+        (row.profiles?.role === "individual" ? "individual" : "business");
+      return {
+        id: row.id,
+        business_id: row.business_id,
+        requester_id: row.requester_id || row.business_id,
+        requester_type: reqType,
+        artist_id: row.artist_id,
+        status: row.status,
+        event_date: row.event_date,
+        event_type: row.event_type,
+        event_location: row.event_location,
+        requirements: row.requirements,
+        indicative_budget:
+          row.indicative_budget !== null
+            ? typeof row.indicative_budget === "number"
+              ? row.indicative_budget
+              : parseFloat(row.indicative_budget)
+            : null,
+        business_message: row.business_message,
+        artist_response: row.artist_response,
+        business_clarification: row.business_clarification,
+        seen_at: row.seen_at,
+        responded_at: row.responded_at,
+        clarified_at: row.clarified_at,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        business_profile: row.profiles
+          ? {
+              id: row.profiles.id,
+              full_name:
+                row.profiles.full_name ||
+                (reqType === "individual"
+                  ? "Individual Client"
+                  : "Business Client"),
+              role: (row.profiles.role as "business") || "business",
+            }
+          : {
+              id: row.requester_id || row.business_id,
+              full_name:
+                reqType === "individual"
+                  ? "Individual Client"
+                  : "Business Client",
+              role: "business" as const,
+            },
+        requester_profile: row.profiles
+          ? {
+              id: row.profiles.id,
+              full_name:
+                row.profiles.full_name ||
+                (reqType === "individual"
+                  ? "Individual Client"
+                  : "Business Client"),
+              role: reqType,
+            }
+          : {
+              id: row.requester_id || row.business_id,
+              full_name:
+                reqType === "individual"
+                  ? "Individual Client"
+                  : "Business Client",
+              role: reqType,
+            },
+        events: (row.booking_enquiry_events || []).sort(
+          (a: BookingEnquiryEvent, b: BookingEnquiryEvent) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        ),
+      };
+    });
 
     return {
       success: true,

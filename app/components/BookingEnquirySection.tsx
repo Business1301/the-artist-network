@@ -55,6 +55,7 @@ export default function BookingEnquirySection({
   const [eventType, setEventType] = useState<BookingEventType>("corporate");
   const [eventLocation, setEventLocation] = useState("");
   const [indicativeBudget, setIndicativeBudget] = useState("");
+  const [numberOfGuests, setNumberOfGuests] = useState("");
   const [requirements, setRequirements] = useState("");
   const [businessMessage, setBusinessMessage] = useState("");
 
@@ -66,6 +67,7 @@ export default function BookingEnquirySection({
     setEventType("corporate");
     setEventLocation("");
     setIndicativeBudget("");
+    setNumberOfGuests("");
     setRequirements("");
     setBusinessMessage("");
     setGeneralError(null);
@@ -120,6 +122,7 @@ export default function BookingEnquirySection({
 
     try {
       const budgetNum = indicativeBudget ? parseFloat(indicativeBudget) : null;
+      const guestsNum = numberOfGuests ? parseInt(numberOfGuests, 10) : null;
 
       const res = await submitBookingEnquiryAction({
         artistId,
@@ -127,8 +130,10 @@ export default function BookingEnquirySection({
         eventType,
         eventLocation: eventLocation.trim() || null,
         indicativeBudget: budgetNum !== null && !isNaN(budgetNum) ? budgetNum : null,
+        numberOfGuests: guestsNum !== null && !isNaN(guestsNum) ? guestsNum : null,
         requirements: requirements.trim() || null,
         businessMessage: businessMessage.trim() || null,
+        message: businessMessage.trim() || null,
       });
 
       if (!res.success) {
@@ -169,15 +174,21 @@ export default function BookingEnquirySection({
               </h3>
             </div>
             <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
-              Sign in with a business or venue account to submit booking enquiries and check pricing.
+              Sign in with an Individual or Business account to check availability and submit direct enquiries.
             </p>
           </div>
-          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
             <Link
               href={`/login?redirectTo=/artists/${artistSlug}`}
               className="flex-1 sm:flex-initial text-center bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-xs transition-colors"
             >
-              Sign In as Business
+              Sign In
+            </Link>
+            <Link
+              href={`/signup?role=individual&redirectTo=/artists/${artistSlug}`}
+              className="flex-1 sm:flex-initial text-center bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl shadow-xs transition-colors"
+            >
+              Join as Individual
             </Link>
             <Link
               href={`/signup?role=business&redirectTo=/artists/${artistSlug}`}
@@ -205,7 +216,7 @@ export default function BookingEnquirySection({
               <strong>This is your public artist profile.</strong>
             ) : (
               <span>
-                You are logged in as an artist. Booking enquiries are submitted by business accounts.
+                You are logged in as an artist. Booking enquiries are submitted by business and client accounts.
               </span>
             )}
           </span>
@@ -223,14 +234,14 @@ export default function BookingEnquirySection({
             🛡️
           </span>
           <span>
-            <strong>Administrator Mode:</strong> Booking enquiry submissions are reserved for business accounts.
+            <strong>Administrator Mode:</strong> Booking enquiry submissions are reserved for client and business accounts.
           </span>
         </div>
       </div>
     );
   }
 
-  // Case D: Authenticated Business User (Actionable CTA & Modal)
+  // Case D: Authenticated Business or Individual User (Actionable CTA & Modal)
   return (
     <>
       {/* Primary Action Card in Profile */}
@@ -319,16 +330,16 @@ export default function BookingEnquirySection({
                   <div className="bg-blue-50 border border-blue-200/80 rounded-xl p-3 text-xs text-blue-900 text-left">
                     <p className="font-semibold mb-0.5">What happens next?</p>
                     <p className="text-blue-800">
-                      You will see this enquiry in your Business Dashboard. If the artist needs more details or accepts, you will be updated directly in the app.
+                      You will see this enquiry in your {currentUser.role === "individual" ? "Client" : "Business"} Dashboard. If the artist needs more details or accepts, you will be updated directly in the app.
                     </p>
                   </div>
 
                   <div className="pt-2 flex flex-col sm:flex-row gap-2.5 justify-center">
                     <Link
-                      href="/dashboard/restaurant"
+                      href={currentUser.role === "individual" ? "/dashboard/client" : "/dashboard/restaurant"}
                       className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition-colors"
                     >
-                      View in Dashboard
+                      View in My Dashboard
                     </Link>
                     <button
                       type="button"
@@ -481,6 +492,35 @@ export default function BookingEnquirySection({
                         </p>
                       )}
                     </div>
+                  </div>
+
+                  {/* Row 3: Estimated Number of Guests */}
+                  <div>
+                    <label
+                      htmlFor="enquiry-guests"
+                      className="block text-xs font-bold text-gray-700 mb-1"
+                    >
+                      Estimated Number of Guests
+                    </label>
+                    <input
+                      id="enquiry-guests"
+                      type="number"
+                      min={1}
+                      max={100000}
+                      placeholder="e.g. 150 guests"
+                      value={numberOfGuests}
+                      onChange={(e) => setNumberOfGuests(e.target.value)}
+                      disabled={isSubmitting}
+                      className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-gray-300 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 font-medium"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      Optional guest headcount (helps the artist assess stage and sound requirements)
+                    </p>
+                    {fieldErrors.numberOfGuests && (
+                      <p className="text-xs text-red-600 mt-0.5">
+                        {fieldErrors.numberOfGuests[0]}
+                      </p>
+                    )}
                   </div>
 
                   {/* Requirements Textarea */}

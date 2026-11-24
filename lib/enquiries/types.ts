@@ -23,7 +23,7 @@ export type BookingEventType =
   | "concert"
   | "other";
 
-export type ActorRole = "business" | "artist" | "admin";
+export type ActorRole = "business" | "artist" | "admin" | "individual";
 
 /**
  * Open statuses consume active enquiry quotas (max 3 per pair, max 10 platform-wide).
@@ -51,6 +51,8 @@ export const TERMINAL_ENQUIRY_STATUSES: readonly BookingEnquiryStatus[] = [
 export interface BookingEnquiry {
   id: string;
   business_id: string;
+  requester_id?: string | null;
+  requester_type?: "business" | "individual" | null;
   artist_id: string;
   status: BookingEnquiryStatus;
   event_date: string; // YYYY-MM-DD
@@ -58,6 +60,7 @@ export interface BookingEnquiry {
   event_location: string | null;
   requirements: string | null;
   indicative_budget: number | null; // Always denominated in INR, non-binding
+  number_of_guests?: number | null;
   business_message: string | null;
   artist_response: string | null;
   business_clarification: string | null;
@@ -100,7 +103,16 @@ export interface EnquiryArtistProfile {
 export interface EnquiryBusinessProfile {
   id: string;
   full_name: string;
-  role: "business";
+  role: "business" | "individual";
+}
+
+/**
+ * Joined requester profile summary (business or individual)
+ */
+export interface EnquiryRequesterProfile {
+  id: string;
+  full_name: string;
+  role: "business" | "individual";
 }
 
 /**
@@ -109,6 +121,7 @@ export interface EnquiryBusinessProfile {
 export interface BookingEnquiryWithDetails extends BookingEnquiry {
   artist_profile?: EnquiryArtistProfile | null;
   business_profile?: EnquiryBusinessProfile | null;
+  requester_profile?: EnquiryRequesterProfile | null;
   events?: BookingEnquiryEvent[];
 }
 

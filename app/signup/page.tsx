@@ -22,6 +22,8 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
       redirect("/admin");
     } else if (currentUser.role === "business") {
       redirect("/dashboard/restaurant");
+    } else if (currentUser.role === "individual") {
+      redirect("/dashboard/client");
     } else {
       redirect("/dashboard/artist");
     }
@@ -29,7 +31,11 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
 
   const resolvedSearchParams = await searchParams;
   const initialRole =
-    resolvedSearchParams.role === "business" ? "business" : "artist";
+    resolvedSearchParams.role === "business"
+      ? "business"
+      : resolvedSearchParams.role === "individual"
+      ? "individual"
+      : "artist";
   const redirectTo =
     typeof resolvedSearchParams.redirectTo === "string"
       ? resolvedSearchParams.redirectTo

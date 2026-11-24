@@ -21,7 +21,10 @@ export default async function Footer({ user }: FooterProps) {
 
   if (!resolvedUser) {
     platformLinks.push({ label: "For Venues & Clients", href: "/#for-businesses" });
+    platformLinks.push({ label: "Book an Artist (Individual)", href: "/signup?role=individual" });
     platformLinks.push({ label: "Register as Venue", href: "/signup?role=business" });
+  } else if (resolvedUser.role === "individual") {
+    platformLinks.push({ label: "My Enquiries", href: "/dashboard/client" });
   } else if (resolvedUser.role === "business") {
     platformLinks.push({ label: "Venue Dashboard", href: "/dashboard/restaurant" });
   } else if (resolvedUser.role === "admin") {
@@ -38,7 +41,7 @@ export default async function Footer({ user }: FooterProps) {
     artistLinks.push({ label: "Artist Calendar", href: "/dashboard/artist/calendar" });
     artistLinks.push({ label: "Edit Showcase Profile", href: "/dashboard/artist/edit" });
     artistLinks.push({ label: "Community Guidelines", href: "/community-guidelines" });
-  } else if (resolvedUser.role === "business") {
+  } else if (resolvedUser.role === "business" || resolvedUser.role === "individual") {
     artistLinks.push({ label: "Browse Artists Directory", href: "/artists" });
     artistLinks.push({ label: "Categories", href: "/categories" });
     artistLinks.push({ label: "Community Guidelines", href: "/community-guidelines" });
@@ -54,7 +57,12 @@ export default async function Footer({ user }: FooterProps) {
       links: platformLinks,
     },
     {
-      heading: resolvedUser?.role === "business" ? "Talent Sourcing" : "For Artists",
+      heading:
+        resolvedUser?.role === "business"
+          ? "Talent Sourcing"
+          : resolvedUser?.role === "individual"
+          ? "Event Planning"
+          : "For Artists",
       links: artistLinks,
     },
     {

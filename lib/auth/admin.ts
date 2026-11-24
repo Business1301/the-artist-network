@@ -56,6 +56,8 @@ export async function requireAdmin(): Promise<VerifiedAdmin> {
       redirect("/dashboard/restaurant");
     } else if (profile?.role === "artist") {
       redirect("/dashboard/artist");
+    } else if (profile?.role === "individual") {
+      redirect("/dashboard/client");
     } else {
       redirect("/login?unauthorized=true");
     }

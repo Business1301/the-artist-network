@@ -291,7 +291,7 @@ export default function ArtistEnquiriesInbox({
               )}
             </div>
             <p className="text-xs sm:text-sm text-gray-500 mt-1">
-              Direct enquiries submitted by business and venue clients. Non-binding initial inquiries.
+              Direct enquiries submitted by business venues and individual clients. Non-binding initial inquiries.
             </p>
           </div>
 
@@ -446,6 +446,17 @@ export default function ArtistEnquiriesInbox({
                       <span className="text-sm sm:text-base font-black text-gray-900">
                         {clientName}
                       </span>
+
+                      {/* Requester Type Badge */}
+                      {enquiry.requester_type === "individual" ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
+                          👤 Individual Client
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                          🏢 Business / Venue
+                        </span>
+                      )}
 
                       {/* Status Badge */}
                       <StatusBadge status={enquiry.status} />

@@ -12,6 +12,8 @@ export function getSafeRedirectPath(
       ? "/admin"
       : role === "business"
       ? "/dashboard/restaurant"
+      : role === "individual"
+      ? "/dashboard/client"
       : "/dashboard/artist";
 
   if (!requestedPath || typeof requestedPath !== "string") {

@@ -71,6 +71,10 @@ export async function requireArtist(
     redirect("/dashboard/restaurant");
   }
 
+  if (profile.role === "individual") {
+    redirect("/dashboard/client");
+  }
+
   // 5. Any other non-artist role → deny access
   if (profile.role !== "artist") {
     redirect("/login?unauthorized=true");

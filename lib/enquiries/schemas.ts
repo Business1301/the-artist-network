@@ -83,6 +83,23 @@ export const submitEnquirySchema = z.object({
     .optional()
     .nullable()
     .transform((val) => (val && val.length > 0 ? val : null)),
+  numberOfGuests: z
+    .union([z.number(), z.string()])
+    .optional()
+    .nullable()
+    .transform((val) => {
+      if (val === undefined || val === null || val === "") return null;
+      const num = typeof val === "number" ? val : parseInt(val, 10);
+      return isNaN(num) ? null : num;
+    })
+    .pipe(
+      z
+        .number({ message: "Number of guests must be a valid number" })
+        .int({ message: "Number of guests must be a whole number" })
+        .min(1, { message: "Number of guests must be at least 1" })
+        .max(100_000, { message: "Number of guests exceeds maximum limit" })
+        .nullable()
+    ),
   indicativeBudget: z
     .union([z.number(), z.string()])
     .optional()
@@ -105,8 +122,13 @@ export const submitEnquirySchema = z.object({
     .string()
     .trim()
     .max(2000, { message: "Business message cannot exceed 2000 characters" })
-    .optional()
-    .nullable()
+    .nullish()
+    .transform((val) => (val && val.length > 0 ? val : null)),
+  message: z
+    .string()
+    .trim()
+    .max(2000, { message: "Message cannot exceed 2000 characters" })
+    .nullish()
     .transform((val) => (val && val.length > 0 ? val : null)),
 });
 

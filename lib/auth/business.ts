@@ -71,6 +71,10 @@ export async function requireBusiness(
     redirect("/dashboard/artist");
   }
 
+  if (profile.role === "individual") {
+    redirect("/dashboard/client");
+  }
+
   // 5. Any other non-business role → deny access
   if (profile.role !== "business") {
     redirect("/login?unauthorized=true");

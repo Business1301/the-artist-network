@@ -9,7 +9,7 @@ import { signUpAction } from "@/app/auth/actions";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 
 interface SignUpClientProps {
-  initialRole?: "artist" | "business";
+  initialRole?: "artist" | "business" | "individual";
   redirectTo?: string;
 }
 
@@ -17,7 +17,7 @@ function SignUpForm({ initialRole = "artist", redirectTo }: SignUpClientProps) {
   const router = useRouter();
   const configured = isSupabaseConfigured();
 
-  const [role, setRole] = useState<"artist" | "business">(initialRole);
+  const [role, setRole] = useState<"artist" | "business" | "individual">(initialRole);
 
   // Artist Fields
   const [fullName, setFullName] = useState("");
@@ -51,7 +51,7 @@ function SignUpForm({ initialRole = "artist", redirectTo }: SignUpClientProps) {
     const newErrors: Record<string, string> = {};
 
     // Validate based on role
-    if (role === "artist") {
+    if (role === "artist" || role === "individual") {
       if (!fullName.trim()) newErrors.fullName = "Full name is required.";
     } else {
       if (!contactName.trim()) newErrors.contactName = "Contact person's name is required.";
@@ -182,7 +182,7 @@ function SignUpForm({ initialRole = "artist", redirectTo }: SignUpClientProps) {
         </div>
 
         {/* Role Selector Tabs */}
-        <div className="grid grid-cols-2 gap-2 p-1.5 bg-gray-50 border border-gray-200 rounded-2xl mb-8">
+        <div className="grid grid-cols-3 gap-1.5 p-1.5 bg-gray-50 border border-gray-200 rounded-2xl mb-8">
           <button
             type="button"
             onClick={() => {
@@ -190,14 +190,14 @@ function SignUpForm({ initialRole = "artist", redirectTo }: SignUpClientProps) {
               setErrors({});
               setNotice(null);
             }}
-            className={`py-3 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 ${
+            className={`py-2.5 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 ${
               role === "artist"
                 ? "bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs"
                 : "bg-white text-gray-600 hover:text-gray-900 border border-gray-200/80"
             }`}
           >
             <span>🎨</span>
-            <span>I&apos;m an Artist</span>
+            <span>Artist</span>
           </button>
 
           <button
@@ -207,14 +207,31 @@ function SignUpForm({ initialRole = "artist", redirectTo }: SignUpClientProps) {
               setErrors({});
               setNotice(null);
             }}
-            className={`py-3 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 ${
+            className={`py-2.5 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 ${
               role === "business"
                 ? "bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs"
                 : "bg-white text-gray-600 hover:text-gray-900 border border-gray-200/80"
             }`}
           >
             <span>🏢</span>
-            <span>Business / Venue</span>
+            <span>Business</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setRole("individual");
+              setErrors({});
+              setNotice(null);
+            }}
+            className={`py-2.5 px-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 ${
+              role === "individual"
+                ? "bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs"
+                : "bg-white text-gray-600 hover:text-gray-900 border border-gray-200/80"
+            }`}
+          >
+            <span>👤</span>
+            <span>Individual</span>
           </button>
         </div>
 
@@ -222,8 +239,10 @@ function SignUpForm({ initialRole = "artist", redirectTo }: SignUpClientProps) {
         <div className="mb-6 p-3 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-600 text-center">
           {role === "artist" ? (
             <span>Creating an <strong>Artist Profile</strong> to showcase your work and receive booking enquiries.</span>
-          ) : (
+          ) : role === "business" ? (
             <span>Creating a <strong>Client / Venue Account</strong> to discover talent, hire performers, and manage bookings.</span>
+          ) : (
+            <span>Creating an <strong>Individual Account</strong> to find and send direct booking enquiries for weddings, parties, and private events.</span>
           )}
         </div>
 
@@ -247,11 +266,11 @@ function SignUpForm({ initialRole = "artist", redirectTo }: SignUpClientProps) {
         {/* Form */}
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
 
-          {/* Artist: Full Name */}
-          {role === "artist" && (
+          {/* Artist or Individual: Full Name */}
+          {(role === "artist" || role === "individual") && (
             <div>
               <label htmlFor="full-name" className="block text-xs font-bold text-gray-700 mb-1.5">
-                Full Name
+                {role === "individual" ? "Your Full Name" : "Full Name"}
               </label>
               <input
                 id="full-name"
@@ -262,7 +281,7 @@ function SignUpForm({ initialRole = "artist", redirectTo }: SignUpClientProps) {
                   setFullName(e.target.value);
                   if (errors.fullName) setErrors((prev) => ({ ...prev, fullName: "" }));
                 }}
-                placeholder="e.g. Arjun Sharma"
+                placeholder={role === "individual" ? "e.g. Priya Sharma" : "e.g. Arjun Sharma"}
                 aria-invalid={!!errors.fullName}
                 aria-describedby={errors.fullName ? "full-name-error" : undefined}
                 className={`w-full px-3.5 py-2.5 rounded-xl border text-sm text-gray-900 bg-white outline-none transition-all ${
