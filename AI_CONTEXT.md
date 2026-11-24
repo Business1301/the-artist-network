@@ -2126,20 +2126,32 @@ All 16 scenarios executed with real JWT-authenticated synthetic accounts on stag
 - **Git Commit:** `19ee393` (`fix(phase-5.2b): replace invalid pg_catalog.coalesce with bare COALESCE and verify staging migrations`).
 - **Production Gate:** Strictly stopped for owner review — NO production push, NO deployment.
 
+---
 
+## 29. Phase 5.2B — Controlled Production Database Release (2026-11-25)
 
+### 29.1 Backup & Restoration Verification Gate (Option A)
+- **Target Production Project:** `jmwkvrghquqqsfwierpj` (`db.jmwkvrghquqqsfwierpj.supabase.co:5432`, PostgreSQL 17.11)
+- **Logical Backup:** Created custom-format (`-Fc`, `--compress=9`) backup across `public`, `auth`, `storage`, and `supabase_migrations` using `pg_dump` (17.2).
+- **Authenticated Encryption & Key Separation:** Encrypted archive with `AES-256-GCM` at `C:\Users\mohit\.tan_secure_backups\tan_prod_backup_20261124184235.dump.enc` (SHA-256 `da9007797c30c14ed378d42d7cfe90fc905a528ed5d05f3cf330cb036cd86dca`) with isolated 256-bit key in `C:\Users\mohit\.tan_vault_keys\tan_prod_backup_20261124184235.key`. Unencrypted raw dump cryptographically overwritten and deleted after verification.
+- **Isolated Restoration Test:** Restored into a disposable local PostgreSQL 17.2 cluster (`127.0.0.1:54322`), verifying 42 enquiries, 119 events, 13 profiles, 13 `auth.users`, foreign-key integrity, 4 legacy RPCs, and 1 ledger row; temporary cluster destroyed immediately after assertions passed.
 
+### 29.2 Migration Normalization & Production SQL Execution
+- **Local Migration History Normalized (Staged in Git Index):** Relocated `supabase/migrations/20261112_artist_calendar_rollback.sql` to `supabase/archive/` and normalized the 8 historical migration filenames to unique 14-digit timestamps (`20261031000000` through `20261117000000`).
+- **Production Runner:** Executed `node scratch/run_production_release.mjs` (Exit 0, migration applied in 371ms inside `BEGIN ... COMMIT`).
+- **Ledger Reconciliation & Recording:** Reconciled the 8 historical migrations (`ON CONFLICT (version) DO NOTHING`), preserved `20261124061326` (`artist_media_storage_rls`, `created_by=mohitrawat6232@gmail.com`), and registered `20261125000000` (`individual_booking`) as row 10 of 10 in `supabase_migrations.schema_migrations`.
 
+### 29.3 Post-Migration Verification Summary
+- **Data Preservation:** Pre/post SHA-256 fingerprints of all 42 enquiries (`(id, business_id, artist_id, status, event_date, event_type, created_at)`) and 119 audit events matched 100% (`withdrawn: 22`, `interested: 12`, `declined: 5`, `submitted: 2`, `seen: 1`). Zero orphan foreign keys.
+- **Historical Backfill:** All 42 Business enquiries populated with `requester_id = business_id`, `requester_type = 'business'`, `guest_count IS NULL`, and 0 NULL requester values.
+- **Schema & Constraints Active:** `business_id` nullable; `requester_id` and `requester_type` `NOT NULL`; `booking_enquiries_requester_check`, `booking_enquiries_requester_type_check`, `booking_enquiries_guest_count_check`, `profiles_role_check` (includes `'individual'`), and `booking_enquiry_events_actor_role_check` (includes `'individual'`) active.
+- **Triggers & Indexes Active:** `on_auth_user_created` (`auth.users`) and `trg_populate_legacy_requester` (`booking_enquiries`) enabled; 4 new requester/partial-quota indexes created.
+- **RPCs & RLS Security:** All 4 legacy Phase 5.1 RPCs and all 3 new Phase 5.2B v2 RPCs verified `SECURITY DEFINER`, `search_path = ""`, executable only by `authenticated`, `postgres`, and `service_role`. RLS enabled on `booking_enquiries` (4 SELECT policies) and `booking_enquiry_events` (2 SELECT policies).
 
-
-
-
-
-
-
-
-
-
-
-
+### 29.4 Booking Table Privilege Hardening (`20261125120000`) & Production Release
+- **Security Hardening Migration:** Applied `supabase/migrations/20261125120000_revoke_booking_extra_privileges.sql` to production via `scratch/run_production_grant_hardening.mjs` (previously validated on staging `iqlbftywtueoozmfjjgy` with negative `42501` `TRUNCATE` check, 10/10 app flow tests, and 12/12 security scenarios).
+- **Verified Client Privileges:** Revoked unnecessary `TRUNCATE`, `TRIGGER`, and `REFERENCES` privileges (along with direct writes) so `PUBLIC` and `anon` hold 0 grants and `authenticated` holds strictly `SELECT` (governed by RLS) on `public.booking_enquiries` and `public.booking_enquiry_events`.
+- **Final Ledger:** Registered `20261125120000` (`revoke_booking_extra_privileges`) as row **11 of 11** in `supabase_migrations.schema_migrations`.
+- **Data Integrity Reconfirmed:** Pre/post SHA-256 digests confirmed all 42 enquiries, 119 audit events, 4 RLS policies on `booking_enquiries`, 2 RLS policies on `booking_enquiry_events`, and all 7 booking RPCs remain intact.
+- **Production Website Release Target:** `https://artist-net-v1.netlify.app` (`master` fast-forward pushed after all TypeScript, ESLint, and Next.js production build gates passed; Netlify executes `npm run build` only with zero automatic database migrations).
 
