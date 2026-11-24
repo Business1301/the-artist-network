@@ -2063,9 +2063,69 @@ Four platform roles are now fully supported:
 - `npm run lint`: 0 errors (0 new warnings; 78 pre-existing warnings in `<img>` and legacy scratch scripts).
 - `npm run build`: 23/23 routes clean (Exit 0).
 - `npm audit --omit=dev`: 0 vulnerabilities.
-- Automated Test Suite (`scratch/test_phase_52b_individual.mjs`): **76 PASSED, 0 FAILED, 16 BLOCKED**.
-- **Task 5 Database Integration Tests**: Verified local Supabase CLI blocker (`docker: command not found`). 16 database integration tests accurately marked as **BLOCKED**; execution against production is strictly prohibited.
-- Local Git Commits: `45c292e`, `1b3ec32`, `50ff99c`.
+- Automated Test Suite (`scratch/test_phase_52b_individual.mjs`): **76 PASSED, 0 FAILED**.
+- Local Git Commits: `45c292e`, `1b3ec32`, `50ff99c`, `8d5d210`, `19ee393`.
+
+---
+
+## 28. Phase 5.2B Isolated Staging Execution & Integration Verification
+
+### 28.1 Staging Environment & Security Controls
+- **Staging Project Ref:** `iqlbftywtueoozmfjjgy` (Name: `tan-staging-phase52b`)
+- **Staging Host:** `db.iqlbftywtueoozmfjjgy.supabase.co:5432`
+- **Protected Production Project:** `jmwkvrghquqqsfwierpj` — **ZERO writes, ZERO migrations, ZERO data modified (strictly protected by hardcoded safety shields)**.
+- **Credential Storage:** Isolated in `.env.staging.local` (verified Git-ignored).
+
+### 28.2 SQL Corrections Applied & Empirically Verified
+- **Issue:** PostgreSQL does not provide a schema-qualified `pg_catalog.coalesce()` function; `COALESCE` is a core SQL syntax special form.
+- **Empirical Test:** Live execution on staging returned `function pg_catalog.coalesce(text, unknown) does not exist`.
+- **Correction:** Replaced schema-qualified `pg_catalog.coalesce(...)` with standard bare `COALESCE(...)` in `supabase/migrations/20261125000000_individual_booking.sql` (lines 57–59). Other schema-qualified functions (`btrim`, `now`, `hashtext`, `char_length`, `split_part`, `pg_advisory_xact_lock`) were empirically confirmed valid.
+
+### 28.3 Incremental Baseline Migration Sequence (All 10 Applied & Verified)
+1. `M1: 20261031_init_auth_schema.sql` — `profiles`, `business_profiles`, auth triggers, base RLS.
+2. `M2: 20261101_artist_profiles_and_portfolio.sql` — `artist_profiles`, `portfolio_items`, slug generator, protection triggers.
+3. `M3: 20261101_admin_system.sql` — `is_admin()`, `admin_audit_logs`, `admin_moderate_artist_profile()`.
+4. `M4: 20261112_artist_calendar.sql` — `artist_calendar_events`, calendar RPCs.
+5. `M5: 20261112_artist_technical_requirements.sql` — `technical_requirements` column.
+6. `M6: 20261112_prevent_past_calendar_events.sql` — Past event booking prevention.
+7. `M7: 20261112_self_publish.sql` — Self-publish rules, suspension check, publication trigger.
+8. `M8: 20261117_booking_enquiries.sql` — Phase 5.1 Business booking schema & RPCs.
+9. `M9: 20261124061326_artist_media_storage_rls.sql` — Storage RLS for `artist-media` bucket.
+10. `M10: 20261125000000_individual_booking.sql` — Phase 5.2B Individual Booking migration.
+
+### 28.4 Phase 5.1 Business Baseline Smoke Test
+- Verified legacy 7-argument `submit_booking_enquiry` RPC execution with synthetic business & published artist accounts.
+- Confirmed enquiry row persistence in `public.booking_enquiries`.
+- Confirmed immutable audit entry in `public.booking_enquiry_events` (`action: 'submitted', actor_role: 'business'`).
+- Confirmed unauthenticated anonymous requests are blocked with error `42501` (`permission denied for table booking_enquiries`).
+
+### 28.5 Phase 5.2B Database Integration Tests (16 of 16 PASSED)
+All 16 scenarios executed with real JWT-authenticated synthetic accounts on staging:
+1. **T1 — Legacy Business RPC Compatibility:** `submit_booking_enquiry` (7 args) populates `requester_id = business_id` and `requester_type = 'business'`. [PASS]
+2. **T2 — Concurrency Lock Collision Prevention:** Concurrent submissions serialize on user advisory lock; duplicate open date rejected. [PASS]
+3. **T3 — Advisory Lock Key Namespace Compatibility:** `submit_booking_enquiry` (v1) vs `submit_booking_enquiry_v2` (v2) concurrent submissions on identical dates serialize without deadlock and reject the duplicate. [PASS]
+4. **T4 — v2 Business Submission:** `submit_booking_enquiry_v2` populates matching `business_id` and `requester_id`, `requester_type = 'business'`, and persists `guest_count = 50`. [PASS]
+5. **T5 — v2 Individual Submission:** `submit_booking_enquiry_v2` populates `business_id IS NULL`, `requester_id = auth.uid()`, and `requester_type = 'individual'`. [PASS]
+6. **T6 — Guest Count Persistence:** Persists integer `500` accurately in `public.booking_enquiries.guest_count`. [PASS]
+7. **T7 — Guest Count Validation Boundaries:** RPC parameter validation rejects non-positive (`0`) guest counts with error `23514`. [PASS]
+8. **T8 — Business Requester Integrity Constraint:** Direct insert with mismatched `business_id != requester_id` strictly rejected by `booking_enquiries_requester_check`. [PASS]
+9. **T9 — Individual Requester Integrity Constraint:** UPDATE attempting to set non-NULL `business_id` on individual enquiry strictly rejected by `booking_enquiries_requester_check`. [PASS]
+10. **T10 — Idempotent Historical Backfill:** All historical enquiries have 0 NULL `requester_id` rows; legacy enquiry correctly backfilled. [PASS]
+11. **T11 — Withdrawal from 'interested' State:** Permitted via `withdraw_booking_enquiry_v2` from non-binding terminal state. [PASS]
+12. **T12 — Withdrawal Rejection When Already Declined:** Strictly blocked with error `23514` ("already declined by the artist"). [PASS]
+13. **T13 — Withdrawal Idempotence on Withdrawn Status:** Repeated withdrawal call is a safe, idempotent no-op. [PASS]
+14. **T14 — Account Deletion Cascade (Business):** Deleting business user cascades to remove associated enquiries cleanly. [PASS]
+15. **T15 — Account Deletion Cascade (Individual):** Deleting individual user cascades to remove associated enquiries cleanly. [PASS]
+16. **T16 — Cross-Tenant RLS Isolation:** Individual user cannot select Business enquiries; Business user cannot select Individual enquiries. [PASS]
+
+### 28.6 Teardown & Quality Gates
+- **Synthetic Account Cleanup:** All synthetic test users deleted via admin API; remaining test enquiries in staging: `0`.
+- `npx tsc --noEmit`: 0 errors.
+- `npm run lint`: 0 errors.
+- `npm run build`: 23/23 routes compiled cleanly.
+- **Git Commit:** `19ee393` (`fix(phase-5.2b): replace invalid pg_catalog.coalesce with bare COALESCE and verify staging migrations`).
+- **Production Gate:** Strictly stopped for owner review — NO production push, NO deployment.
+
 
 
 
