@@ -85,7 +85,7 @@ export default function PortfolioManager({
 
       const { error: uploadErr } = await supabase.storage
         .from("artist-media")
-        .upload(filePath, file, { upsert: true });
+        .upload(filePath, file, { upsert: false });
 
       if (uploadErr) throw uploadErr;
 

@@ -225,7 +225,7 @@ export default function ArtistProfileEditorPage() {
 
       const { error: uploadError } = await supabase.storage
         .from("artist-media")
-        .upload(filePath, file, { upsert: true });
+        .upload(filePath, file, { upsert: false });
 
       if (uploadError) {
         throw uploadError;
@@ -536,9 +536,23 @@ export default function ArtistProfileEditorPage() {
                         ? "⚠️ Changes Needed"
                         : "📝 Draft in Progress"}
                     </span>
-                    {existingProfile?.is_verified && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                        ✓ Verified Artist
+                    {existingProfile?.is_verified ? (
+                      <span
+                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300"
+                        title="Your profile is officially verified by platform administration."
+                      >
+                        <svg className="w-3 h-3 text-emerald-600" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        Verified Artist
+                      </span>
+                    ) : (
+                      <span
+                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-100 text-zinc-700 border border-zinc-200"
+                        title="Your profile is published as a community artist. Administrative verification is granted by the platform team."
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" aria-hidden="true" />
+                        Not Verified
                       </span>
                     )}
                   </div>

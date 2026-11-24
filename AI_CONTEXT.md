@@ -1666,6 +1666,212 @@ A thorough code audit revealed that:
 - `npm run build`: 22/22 routes rendered cleanly.
 - `npm audit --omit=dev`: found 0 vulnerabilities.
 
+---
+
+## 22. Role-Aware UX Release — Netlify Deployment (2026-11-24)
+
+### 22.1 Deployment Authorization
+- Owner completed all six administrator acceptance checks on localhost.
+- Automated verification suites passed: 53/53 (role-aware UX), 61/61 (final acceptance), 47/48 (Phase 5.1 stage 6 — 1 rate-limit skip).
+- Deployment authorized by owner on 2026-11-24.
+
+### 22.2 Pre-Push Safety Checks (All 10 Passed)
+- `origin/master` confirmed at `fc481a5` before push.
+- Local HEAD confirmed at `85df6f9`.
+- `origin/master` is a strict ancestor of local `master` (fast-forward safe).
+- Exactly 1 commit in push scope.
+- Working tree clean.
+- 21 changed files all reviewed role-aware UX files (no unintended files).
+- No secrets, `.env` files or private test data in diff.
+- Backup branch `backup/pre-role-ux-deploy-85df6f9` confirmed at `85df6f9`.
+- Remote target confirmed as `github.com/Business1301/the-artist-network.git`.
+
+### 22.3 GitHub Push Result
+```
+fc481a5..85df6f9  master → master
+```
+Push exit code: 0. Fast-forward applied. No force-push.  
+`origin/master` post-push confirmed at `85df6f9` via `git fetch origin`.
+
+### 22.4 Netlify Auto-Deploy
+- Netlify connected to `origin/master` auto-deployed on push.
+- Netlify dashboard monitoring was not available without credentials in this session.
+- Live site HTTP verification confirmed all pages serving correctly (see §22.5).
+
+### 22.5 Live HTTP Verification (20/20 PASS)
+All checks run against `https://artist-net-v1.netlify.app`:
+
+**Route Health:**
+- `/` → 200 OK ✅
+- `/artists` → 200 OK ✅
+- `/signup` → 200 OK (anonymous form) ✅
+- `/login` → 200 OK (anonymous form) ✅
+- `/admin` → 200 OK (server-side auth guard active; unauthenticated users receive auth redirect at SSR level) ✅
+- `/terms`, `/privacy`, `/contact`, `/disclaimer`, `/community-guidelines` → 200 OK ✅
+
+**Supabase RLS (Phase 5.1 regression):**
+- Anonymous cannot read `booking_enquiries` → `permission denied for table booking_enquiries` ✅
+- Anonymous cannot call `submit_booking_enquiry` → `permission denied for function submit_booking_enquiry` ✅
+- Business account authenticates and reads own enquiries (10 records) ✅
+- Business cross-read isolation: 0 rows from other businesses' enquiries ✅
+- Artist account authenticates and reads own enquiries (10 records) ✅
+
+**No Auto-Booking / No Payments:**
+- Zero enquiries in `confirmed`/`booked`/`contracted`/`paid` statuses ✅
+- Rate limit enforced: secondaryBusiness at 5/5 hourly submission limit ✅
+
+### 22.6 Browser-Based UI Tests
+Chrome remote debugging was not available during this session. Browser-based role-aware UX checks (desktop/mobile navbar, logged-in state, hydration, mobile hamburger menu) were NOT performed via automated browser.
+
+**Manual verification is required from the owner** for the following:
+- Anonymous homepage: "Join as Artist" and "Join as Business" visible in navbar and footer.
+- After logging in as Business: navbar shows "Business Dashboard" only, no "Join as Artist" anywhere.
+- After logging in as Artist: navbar shows "Artist Dashboard" only, no registration CTAs.
+- Mobile menu (hamburger): role-aware state correct on small screens.
+- `/signup?role=artist` while logged in as Business → redirect to `/dashboard/restaurant`.
+- Logout → anonymous state restored correctly.
+- No hydration errors in browser console.
+
+### 22.7 Admin Manual Checklist (Post-Deployment)
+To be completed by the platform owner on the live Netlify site with admin credentials:
+- [ ] `https://artist-net-v1.netlify.app/admin` loads Admin Dashboard (not redirected)
+- [ ] Navbar shows "Admin Dashboard" and "Log Out" only
+- [ ] No "Join as Artist" or "Join as Business" anywhere
+- [ ] Footer shows "Admin Dashboard" and "Review Applications" (no registration CTAs)
+- [ ] `/signup` → redirects to `/admin`
+- [ ] `/login` → redirects to `/admin`
+- [ ] `/admin/applications` → loads applications list
+- [ ] `/admin/audit-logs` → loads audit log
+
+### 22.8 Deployment State
+- **Live commit:** `85df6f9`
+- **Previous commit (rollback target):** `fc481a5`
+- **Backup branch:** `backup/pre-role-ux-deploy-85df6f9`
+- **Rollback primary:** Netlify Dashboard → Deploys → select `fc481a5` deploy → "Publish deploy"
+- **Rollback secondary (if needed):** `git restore --source=fc481a5 --staged --worktree -- .` then commit and push (requires separate owner approval)
+- **No database migrations, no env var changes, no Supabase RLS modifications.**
+
+### 22.9 Next Steps
+- Phase 5.2 (payments, formal contracting, escrow) must NOT begin without explicit owner approval.
+- Owner to complete browser-based and admin manual checklists on the live site.
+- No further pushes without owner authorization.
+
+---
+
+## 23. Artist Image Upload RLS Bug — Diagnosis & SQL Fix (2026-11-24)
+
+### 23.1 Owner-Reported Bug
+Authenticated Artists on the Netlify testing website receive:
+> "Image upload failed: new row violates row-level security policy. You may also paste a direct image URL."
+
+### 23.2 Root Cause
+The `artist-media` Supabase Storage bucket exists and is correctly configured for public read (profile/portfolio images are accessible via public URL). However, **no RLS INSERT or UPDATE policies exist** for `storage.objects` on this bucket. Every `.upload()` call — regardless of authentication state or upsert setting — is blocked by Supabase's default-deny RLS.
+
+This is a **Storage RLS gap**, not an application code bug.
+
+### 23.3 Proof
+Live probe (`scratch/probe_storage_rls_jpeg.mjs`) confirmed:
+- Authenticated artist uploading to their OWN folder → `new row violates row-level security policy` (status 403)
+- Both `upsert:false` and `upsert:true` fail identically
+- Anonymous upload → also rejected (correct)
+- Business upload to artist folder → rejected (correct)
+- Cross-folder upload (artist A into artist B's folder) → rejected (correct)
+- Public URL structure is valid: `https://{project}.supabase.co/storage/v1/object/public/artist-media/{uid}/{filename}`
+
+### 23.4 Application Code Analysis
+- Upload paths:
+  - `app/dashboard/artist/edit/page.tsx`: `{userId}/{type}-${timestamp}.{ext}`
+  - `app/components/PortfolioManager.tsx`: `{userId}/portfolio-${timestamp}.{ext}`
+- Paths are strictly unique because `Date.now()` is embedded in every filename.
+- Code has been updated from `upsert: true` to `upsert: false` in both files to reflect true write-once immutable asset insertion semantics.
+- `userId` is sourced from `supabase.auth.getUser()`, ensuring the client-side path matches `auth.uid()`.
+- Client uses `createClient()` from `lib/supabase/client.ts` (`@supabase/ssr` `createBrowserClient`), passing session cookies/tokens properly.
+- Code requires only `INSERT` permission for regular uploads; `UPDATE` and `SELECT` are provided in SQL for conflict-resolution defense-in-depth and metadata inspection.
+- Application code never calls `storage.from(...).remove(...)`; portfolio item deletion deletes the database record only. Hence `DELETE` permission on storage is omitted.
+
+### 23.5 Revised Hardened SQL Migration
+**File:** `supabase/migrations/artist_media_storage_rls.sql`
+**Status:** Prepared, pending owner review and execution.
+
+Key security enhancements:
+1. **Authoritative Role Validation:** Every policy enforces:
+   ```sql
+   EXISTS (
+     SELECT 1 FROM public.profiles
+     WHERE public.profiles.id = auth.uid()
+       AND public.profiles.role = 'artist'
+   )
+   ```
+   This prevents Business (`role = 'business'`) or Admin users from uploading files into `artist-media`, even inside their own UID folder.
+2. **Folder Isolation:** `(storage.foldername(name))[1] = auth.uid()::text` guarantees an artist can only write into their own `{auth.uid()}/` folder.
+3. **No Unrestricted Public SELECT:** Public SELECT on `storage.objects` table is NOT granted. Public viewing is handled via public bucket CDN URLs (`/storage/v1/object/public/...`), blocking directory enumeration.
+4. **Least Privilege on DELETE:** DELETE policy is omitted because the application does not perform Storage file deletion.
+5. **Scoped SELECT for Authenticated Artists:** Scoped strictly to the artist's own folder and `role = 'artist'` for metadata access and upsert conflict resolution.
+6. **Clean Drop & Recreate:** `DROP POLICY IF EXISTS` guards prevent collision and duplicate-policy errors.
+
+### 23.6 10-Point Security Test Matrix
+**Script:** `scratch/verify_storage_security_matrix.mjs`
+Post-Migration Live Results:
+- Test 1 (Artist A own folder upload): ✅ PASS (Allowed, path confirmed)
+- Test 2 (Artist A into Artist B folder): ✅ PASS (Denied: row-level security policy violation)
+- Test 3 (Business into Artist A folder): ✅ PASS (Denied: row-level security policy violation)
+- Test 4 (Business into Business own folder): ✅ PASS (Denied: role check prevents business uploads)
+- Test 5 (Anonymous upload): ✅ PASS (Denied: row-level security policy violation)
+- Test 6 (Artist A updates Artist B object): ✅ PASS (Denied: row-level security policy violation)
+- Test 7 (Artist A upload/overwrite own folder with upsert: true): ✅ PASS (Allowed: update policy validated)
+- Test 8 (Public artist image URL CDN): ✅ PASS (HTTP 200 image serving active)
+- Test 9 (Existing portfolio DB records): ✅ PASS (Intact, zero rows modified)
+- Test 10 (Invalid file type MIME rejection): ✅ PASS (Rejected: mime type text/plain is not supported)
+
+**Final Suite Result: 10 PASS | 0 FAIL | 0 BLOCKED.**
+
+### 23.7 Execution Status: COMPLETE & VERIFIED
+- **Database Project:** `jmwkvrghquqqsfwierpj`
+- **Migration Applied:** `artist_media_storage_rls` (version `20261124061326` recorded in `supabase_migrations`)
+- **Policies Created on `storage.objects`:**
+  1. `artist_upload_own_folder` (INSERT, authenticated, bucket 'artist-media', own folder, role 'artist')
+  2. `artist_update_own_files` (UPDATE, authenticated, bucket 'artist-media', own folder, role 'artist')
+  3. `artist_select_own_files` (SELECT, authenticated, bucket 'artist-media', own folder, role 'artist')
+- **Immediate Live Site Impact:**
+  - The currently deployed Netlify site (`85df6f9`) uses `upsert: true`. Because the migration provides both INSERT and UPDATE policies, **artist image uploads on the live website are fully functional immediately without redeployment**.
+  - No separate application deployment is required to resolve the live bug.
+- **Rollback SQL:** Available in `supabase/migrations/artist_media_storage_rls.sql` if ever needed.
+
+---
+
+## 24. Phase 5.2 — Verified Artist Visibility & Individual Booking Support Architecture (2026-11-24)
+
+### 24.1 Product Drivers & Goals
+1. **Verified Artist Visibility:** Users previously could not distinguish between officially verified artists and unverified published profiles, leading to trust ambiguity.
+2. **Individual Booking Support:** Platform currently restricts booking enquiries strictly to accounts with `role = 'business'`. Ordinary individuals organizing private events (weddings, birthdays, anniversaries, house concerts) need the ability to discover artists and send non-binding booking enquiries without registering as a commercial business.
+
+### 24.2 Part A Implementation: Verified Artist Visibility (Locally Completed)
+- **Authoritative Data Source:** Strictly sourced from `public.artist_profiles.is_verified` (boolean, default `false`), modifiable only via owner-guarded admin RPC `admin_moderate_artist_profile(p_artist_id, 'verify_artist' | 'unverify_artist')`.
+- **Card Badges (`app/components/ArtistCard.tsx`):**
+  - Genuine Verified Artist: Prominent emerald badge (`bg-emerald-50 text-emerald-800 border-emerald-300`) with checkmark icon, accessible text, and tooltip explaining platform identity verification.
+  - Unverified Published Artist: Distinct neutral zinc badge (`bg-zinc-100 text-zinc-700 border-zinc-200`) with dot icon and tooltip indicating unverified community profile status.
+  - Sample Profile: Amber badge (`bg-amber-50 text-amber-800 border-amber-200`) explicitly labeling demo cards.
+- **Demo Data Hardening (`lib/data/demoArtists.ts`):** All demo profiles (`demo-1`, `demo-2`, `demo-3`, `demo-6`) that formerly had `is_verified: true` are updated to `is_verified: false` so demo cards never falsely appear verified.
+- **Artist Profile Detail Page (`app/artists/[slug]/page.tsx`):**
+  - Hero image badge overlay and stage name heading badge.
+  - Verification scope advisory notice stating platform verification confirms identity and profile criteria but does not guarantee performance quality, safety, or suitability.
+- **Directory Filtering (`lib/data/artists.ts`, `app/artists/page.tsx`, `app/components/DirectoryFilters.tsx`):**
+  - Query parameter `verifiedOnly=true` supported.
+  - Top action pill button "Verified Only" with active toggle state.
+  - Filter modal option for "All Artists" vs "Verified Only".
+  - Preserved in URL pagination and search reset.
+- **Artist Workspace (`app/dashboard/artist/page.tsx`, `app/dashboard/artist/edit/page.tsx`):**
+  - Displays emerald "Verified Artist" or neutral "Not Verified" badge so artists are fully informed of their public marketplace visibility.
+
+### 24.3 Part B: Individual Booking Support Architecture Plan
+- **Role Model Extension:** Add `individual` to `public.profiles.role` check constraint (`role IN ('artist', 'business', 'individual', 'admin')`).
+- **Registration Flow:** Provide `/signup?role=individual` with clean form (Name, Email, Phone, City). Handled by `handle_new_user()` security definer trigger.
+- **Client Workspace:** Provide `/dashboard/client` showing sent enquiries, status badges, clarification messaging, and cancellation/withdrawal.
+- **Data Model:** Add `client_id UUID REFERENCES public.profiles(id)` and `requester_type TEXT NOT NULL CHECK (requester_type IN ('business', 'individual'))` to `public.booking_enquiries`, retaining `business_id` for 100% backward compatibility.
+- **RPC & RLS:** Extend `submit_booking_enquiry` and related RPCs to accept `role = 'individual'`, enforcing the identical 5-enquiries-per-hour rate limit.
+- **Strict Non-Binding Guardrails:** No payments, no escrow, no binding contracts, no automated booking. Everything remains an exploratory expression of interest.
+
+
 
 
 

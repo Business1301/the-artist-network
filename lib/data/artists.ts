@@ -29,6 +29,7 @@ export interface ArtistDiscoveryFilters {
   minPrice?: number;
   maxPrice?: number;
   sortBy?: "recommended" | "price_low_high" | "price_high_low" | "newest";
+  verifiedOnly?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -173,7 +174,12 @@ export async function getPublishedArtists(
     query = query.lte("starting_price", filters.maxPrice);
   }
 
-  // 6. Sorting Order
+  // 6. Verified Filter (Phase 5.2 requirement: filter for verified artists only)
+  if (filters.verifiedOnly) {
+    query = query.eq("is_verified", true);
+  }
+
+  // 7. Sorting Order
   switch (sortBy) {
     case "price_low_high":
       query = query

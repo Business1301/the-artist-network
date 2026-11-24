@@ -22,7 +22,7 @@ export const DEMO_SHOWCASE_ARTISTS: PublicArtistSummary[] = [
     pricing_unit: "per performance",
     profile_image_url: null,
     cover_image_url: null,
-    is_verified: true,
+    is_verified: false,
   },
   {
     id: "demo-2",
@@ -40,7 +40,7 @@ export const DEMO_SHOWCASE_ARTISTS: PublicArtistSummary[] = [
     pricing_unit: "per performance",
     profile_image_url: null,
     cover_image_url: null,
-    is_verified: true,
+    is_verified: false,
   },
   {
     id: "demo-3",
@@ -58,7 +58,7 @@ export const DEMO_SHOWCASE_ARTISTS: PublicArtistSummary[] = [
     pricing_unit: "per event",
     profile_image_url: null,
     cover_image_url: null,
-    is_verified: true,
+    is_verified: false,
   },
   {
     id: "demo-4",
@@ -112,7 +112,7 @@ export const DEMO_SHOWCASE_ARTISTS: PublicArtistSummary[] = [
     pricing_unit: "per event",
     profile_image_url: null,
     cover_image_url: null,
-    is_verified: true,
+    is_verified: false,
   },
 ];
 

@@ -121,10 +121,38 @@ async function ArtistProfileContent({
               </div>
             )}
 
-            {profile.is_verified && (
+            {/* Verification Badge Overlay */}
+            {profile.is_verified ? (
               <div className="absolute top-3 left-3 z-10">
-                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-white/95 text-blue-600 shadow-sm backdrop-blur-sm">
-                  ✓ Verified Artist
+                <span
+                  className="px-3 py-1 rounded-full text-xs font-bold bg-white/95 text-emerald-700 border border-emerald-200/90 shadow-sm backdrop-blur-sm flex items-center gap-1.5"
+                  title="Identity verified by platform administration. Does not guarantee performance, safety, or suitability."
+                  aria-label="Verified Artist Profile"
+                >
+                  <svg
+                    className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  <span>Verified Artist</span>
+                </span>
+              </div>
+            ) : (
+              <div className="absolute top-3 left-3 z-10">
+                <span
+                  className="px-3 py-1 rounded-full text-xs font-medium bg-white/90 text-zinc-600 border border-zinc-200/90 shadow-2xs backdrop-blur-xs flex items-center gap-1.5"
+                  title="Published community profile — identity verification not requested or pending review."
+                  aria-label="Unverified Community Profile"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 flex-shrink-0" aria-hidden="true" />
+                  <span>Not Verified</span>
                 </span>
               </div>
             )}
@@ -132,10 +160,27 @@ async function ArtistProfileContent({
 
           {/* Card Info Details */}
           <div className="p-5 sm:p-6">
-            <div className="flex items-center justify-between gap-3">
-              <h1 className="text-xl sm:text-2xl font-black text-gray-900 uppercase tracking-wide">
-                {profile.stage_name}
-              </h1>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-black text-gray-900 uppercase tracking-wide">
+                  {profile.stage_name}
+                </h1>
+                {profile.is_verified ? (
+                  <span
+                    className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1"
+                    title="Identity verified by platform administration."
+                  >
+                    ✓ Verified
+                  </span>
+                ) : (
+                  <span
+                    className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-600 border border-zinc-200 flex items-center gap-1"
+                    title="Community profile — verification not requested or pending."
+                  >
+                    Not Verified
+                  </span>
+                )}
+              </div>
 
               {/* Social and Share Action Buttons */}
               <div className="flex items-center gap-2">
@@ -147,6 +192,19 @@ async function ArtistProfileContent({
                 />
                 <ShareArtistButton title={profile.stage_name} />
               </div>
+            </div>
+
+            {/* Verification Scope Advisory Notice */}
+            <div className="mt-2 text-[11px] text-zinc-500 flex items-center gap-1.5 font-normal">
+              {profile.is_verified ? (
+                <span>
+                  🛡️ <strong>Verified Profile:</strong> Identity verified by platform administration. Verification does not guarantee performance, safety, or suitability.
+                </span>
+              ) : (
+                <span>
+                  ℹ️ <strong>Community Profile:</strong> Published by artist — verification pending or not requested.
+                </span>
+              )}
             </div>
 
             {/* Category with Person Icon */}

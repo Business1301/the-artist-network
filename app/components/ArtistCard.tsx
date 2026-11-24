@@ -36,20 +36,51 @@ export default function ArtistCard({ artist, isDemo = false }: ArtistCardProps) 
           </div>
         )}
 
-        {/* Verified Badge Overlay */}
-        {artist.is_verified && (
+        {/* Verification Status Badge Overlay */}
+        {!isDemo ? (
+          artist.is_verified ? (
+            <div className="absolute top-3 left-3 z-10">
+              <span
+                className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-white/95 text-emerald-700 border border-emerald-200/90 shadow-sm backdrop-blur-sm flex items-center gap-1.5"
+                title="Identity verified by platform administration. Platform verification does not guarantee performance, safety, or suitability."
+                aria-label="Verified Artist Profile"
+              >
+                <svg
+                  className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                  aria-hidden="true"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <span>Verified Artist</span>
+              </span>
+            </div>
+          ) : (
+            <div className="absolute top-3 left-3 z-10">
+              <span
+                className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-white/90 text-zinc-600 border border-zinc-200/90 shadow-2xs backdrop-blur-xs flex items-center gap-1.5"
+                title="Published community profile — identity verification not requested or pending review."
+                aria-label="Unverified Community Profile"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 flex-shrink-0" aria-hidden="true" />
+                <span>Not Verified</span>
+              </span>
+            </div>
+          )
+        ) : (
+          /* Demo Profile Indicator — Clearly separated from real database verification */
           <div className="absolute top-3 left-3 z-10">
-            <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-white/95 text-blue-600 shadow-sm backdrop-blur-sm flex items-center gap-1">
-              ✓ Verified
-            </span>
-          </div>
-        )}
-
-        {/* Demo Indicator */}
-        {isDemo && (
-          <div className="absolute top-3 right-3 z-10">
-            <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-500 text-white uppercase tracking-wider shadow-sm">
-              Sample
+            <span
+              className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/95 text-white shadow-sm flex items-center gap-1"
+              title="Demonstration showcase profile only — not a real artist."
+              aria-label="Demonstration Sample Profile"
+            >
+              <span>Sample Profile</span>
             </span>
           </div>
         )}

@@ -57,6 +57,7 @@ interface PageProps {
     city?: string;
     price?: string;
     sortBy?: "recommended" | "price_low_high" | "price_high_low" | "newest";
+    verifiedOnly?: string;
     page?: string;
     demo?: string;
   }>;
@@ -94,6 +95,7 @@ async function DirectoryContent({
   const { minPrice, maxPrice } = parsePriceRange(params.price);
   const currentPage = Math.max(1, Number(params.page) || 1);
   const pageSize = 9;
+  const isVerifiedOnly = params.verifiedOnly === "true";
 
   const filters: ArtistDiscoveryFilters = {
     query: params.q,
@@ -102,6 +104,7 @@ async function DirectoryContent({
     minPrice,
     maxPrice,
     sortBy: params.sortBy || "recommended",
+    verifiedOnly: isVerifiedOnly,
     page: currentPage,
     pageSize,
   };
@@ -131,7 +134,8 @@ async function DirectoryContent({
       (params.category && params.category !== "all") ||
       (params.city && params.city !== "all") ||
       (params.price && params.price !== "all") ||
-      (params.sortBy && params.sortBy !== "recommended")
+      (params.sortBy && params.sortBy !== "recommended") ||
+      isVerifiedOnly
   );
 
   // Determine which list to display
@@ -141,6 +145,9 @@ async function DirectoryContent({
 
   if (isDemoActive) {
     let demoList = [...DEMO_SHOWCASE_ARTISTS];
+    if (isVerifiedOnly) {
+      demoList = demoList.filter((a) => a.is_verified);
+    }
     if (params.category && params.category !== "all") {
       const catFilter = params.category.toLowerCase();
       demoList = demoList.filter((a) =>
@@ -184,6 +191,7 @@ async function DirectoryContent({
     if (params.city && params.city !== "all") p.set("city", params.city);
     if (params.price && params.price !== "all") p.set("price", params.price);
     if (params.sortBy && params.sortBy !== "recommended") p.set("sortBy", params.sortBy);
+    if (isVerifiedOnly) p.set("verifiedOnly", "true");
     if (isDemoActive) p.set("demo", "true");
     p.set("page", pageNumber.toString());
     return `/artists?${p.toString()}`;

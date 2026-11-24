@@ -40,6 +40,7 @@ export default function DirectoryFilters({
   const currentCity = searchParams.get("city") || "all";
   const currentPrice = searchParams.get("price") || "all";
   const currentSort = searchParams.get("sortBy") || "recommended";
+  const currentVerified = searchParams.get("verifiedOnly") === "true";
 
   // Modals state for city picker & filter drawer
   const [cityModalOpen, setCityModalOpen] = useState(false);
@@ -100,6 +101,7 @@ export default function DirectoryFilters({
     currentCategory !== "all",
     currentPrice !== "all",
     currentSort !== "recommended",
+    currentVerified,
   ].filter(Boolean).length;
 
   return (
@@ -145,12 +147,12 @@ export default function DirectoryFilters({
       </div>
 
       {/* 2. Action Pill Buttons matching Screenshot 1 */}
-      <div className="flex items-center justify-center gap-3 max-w-xl mx-auto">
+      <div className="flex flex-wrap items-center justify-center gap-2.5 max-w-xl mx-auto">
         {/* City Pill Button */}
         <button
           type="button"
           onClick={() => setCityModalOpen(true)}
-          className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white font-semibold text-sm shadow-sm transition-all"
+          className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white font-semibold text-sm shadow-sm transition-all"
         >
           <svg
             className="w-4 h-4 text-white flex-shrink-0"
@@ -171,11 +173,38 @@ export default function DirectoryFilters({
           </span>
         </button>
 
+        {/* Verified Only Toggle Button */}
+        <button
+          type="button"
+          onClick={() => updateFilter("verifiedOnly", currentVerified ? "all" : "true")}
+          aria-pressed={currentVerified}
+          title="Filter to show only platform-verified artists"
+          className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border text-sm font-semibold shadow-xs transition-all ${
+            currentVerified
+              ? "bg-emerald-50 border-emerald-300 text-emerald-800 ring-2 ring-emerald-500/20"
+              : "bg-white border-gray-300 hover:bg-gray-50 text-gray-700"
+          }`}
+        >
+          <svg
+            className={`w-4 h-4 flex-shrink-0 ${currentVerified ? "text-emerald-600" : "text-gray-400"}`}
+            fill="currentColor"
+            viewBox="0 0 20 20"
+            aria-hidden="true"
+          >
+            <path
+              fillRule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+              clipRule="evenodd"
+            />
+          </svg>
+          <span className="whitespace-nowrap">Verified Only</span>
+        </button>
+
         {/* Filter Pill Button */}
         <button
           type="button"
           onClick={() => setFilterModalOpen(true)}
-          className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 font-semibold text-sm shadow-xs transition-all relative"
+          className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 font-semibold text-sm shadow-xs transition-all relative"
         >
           <svg
             className="w-4 h-4 text-gray-600 flex-shrink-0"
@@ -199,7 +228,7 @@ export default function DirectoryFilters({
         </button>
 
         {/* Quick Reset if filters active */}
-        {(currentCity !== "all" || currentCategory !== "all" || currentQuery || currentPrice !== "all") && (
+        {(currentCity !== "all" || currentCategory !== "all" || currentQuery || currentPrice !== "all" || currentVerified || currentSort !== "recommended") && (
           <button
             type="button"
             onClick={handleReset}
@@ -290,6 +319,40 @@ export default function DirectoryFilters({
             </div>
 
             <div className="overflow-y-auto py-4 space-y-5 flex-1 text-left">
+              {/* Verification Status */}
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+                  Verification Status
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => updateFilter("verifiedOnly", "all")}
+                    className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all text-center ${
+                      !currentVerified
+                        ? "bg-blue-50 border-blue-300 text-blue-700 font-bold"
+                        : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    All Artists
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateFilter("verifiedOnly", "true")}
+                    className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all flex items-center justify-center gap-1.5 ${
+                      currentVerified
+                        ? "bg-emerald-50 border-emerald-300 text-emerald-800 font-bold"
+                        : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                    }`}
+                  >
+                    <svg className="w-3.5 h-3.5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <span>Verified Only</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Category */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">

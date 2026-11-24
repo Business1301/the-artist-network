@@ -1056,23 +1056,41 @@ Acceptance criteria:
 - Search returns appropriate profiles.
 - Private or unapproved profiles are excluded.
 
-## PHASE 5 — Business accounts and enquiries
+## PHASE 5 — Business accounts, verified artists, and enquiries
 
+### Phase 5.1 — Non-Binding Business Enquiry System (Completed & Deployed)
 Build:
 - Business registration and profiles
 - Artist shortlists
-- Enquiry form
-- Enquiry persistence
-- Client enquiry dashboard
-- Artist enquiry dashboard
-- Enquiry status updates
+- Non-binding enquiry form
+- Enquiry persistence and audit event logging
+- Business enquiry dashboard
+- Artist enquiry inbox and clarification flow
+- Non-binding expression of interest / decline / withdrawal
 
 Acceptance criteria:
-- A client can send a genuine enquiry.
-- The enquiry is saved in the database.
-- The selected artist can view it.
-- Unrelated users cannot read it.
-- The user receives a clear success or error message.
+- A verified business can send a non-binding enquiry.
+- Exactly one enquiry is saved in the database with an audit event log.
+- The selected artist can view it and respond.
+- Unrelated users cannot read or modify it (strict RLS).
+- Zero automated bookings, zero binding contracts, zero payments/escrow.
+
+### Phase 5.2 — Verified Artist Visibility & Individual Booking Support (Current)
+Part A (Implemented Locally):
+- Prominent "Verified Artist" badge for officially verified profiles (`is_verified === true`).
+- Distinct, neutral "Not Verified" indicator for unverified community profiles (`is_verified === false`).
+- Sample profile badge for demonstration cards (`is_verified: false` enforced across demo data).
+- Directory filter "Verified Only" toggle and drawer option.
+- Artist detail page verification status header, hero overlay, and platform verification disclaimer.
+- Artist workspace badges reflecting public verification status.
+
+Part B (Architectural Design & Review):
+- Expand platform user roles to include `individual` alongside `artist`, `business`, and `admin`.
+- Individual user registration and authentication flow (`/signup?role=individual`).
+- Dedicated Individual client dashboard (`/dashboard/client`).
+- Unified non-binding booking enquiry model (`client_id`, `requester_type`, `event_category`).
+- Strict RLS and RPC authorization ensuring 100% backward compatibility for existing business accounts.
+- Preserving non-binding terms: no payments, no contracts, no escrow, no automated booking.
 
 ## PHASE 6 — Opportunities
 
