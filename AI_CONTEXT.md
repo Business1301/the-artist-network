@@ -2012,10 +2012,12 @@ All six admin moderation server actions now revalidate:
 
 ### 26.6 Deployment Status
 - **Local commit**: `feat(admin): improve artist verification management and cache refresh`
-- **Origin/master**: `771b1bb` (Phase 5.2A live release).
-- **Local HEAD**: ahead of origin by 2 commits (`c472af8` docs, plus this commit).
-- **NO push to GitHub or Netlify** — awaiting platform owner deployment authorization.
-- **No SQL executed, no database schema changes, no live artist records modified.**
+- **Origin/master pushed:** `771b1bb..c4dcb38` fast-forward — 2026-11-24T08:16:46 UTC
+- **GitHub remote HEAD:** `c4dcb38`
+- **Netlify auto-deploy:** Triggered automatically; all 7 HTTP routes returned 200 OK post-deployment
+- **Live website:** https://artist-net-v1.netlify.app
+- **NO SQL executed, no database schema changes, no live artist records modified.**
+- **Admin verification controls accessible only to authenticated admin sessions (SSR auth guard confirmed: unauthenticated visitors receive login redirect).**
 
 
 
