@@ -109,6 +109,7 @@ ALTER TABLE public.booking_enquiries
 
 -- ============================================================
 -- 4. Idempotent Backfill of Historical Business Enquiries
+--    (Must execute BEFORE enforcing column-level NOT NULL constraints)
 -- ============================================================
 
 UPDATE public.booking_enquiries
@@ -117,18 +118,30 @@ SET requester_id = business_id,
 WHERE requester_id IS NULL AND business_id IS NOT NULL;
 
 -- ============================================================
--- 5. Strict Requester Integrity Constraint
---    - Business enquiries must have matching business_id and requester_id
---    - Individual enquiries must have business_id IS NULL and requester_id set
+-- 5. Strict Requester Integrity Constraints
+--    - Enforce NOT NULL at column level (eliminates UNKNOWN evaluation)
+--    - Enforce relational integrity constraint:
+--      * Business enquiries: business_id IS NOT NULL AND requester_id = business_id
+--      * Individual enquiries: business_id IS NULL AND requester_id IS NOT NULL
 -- ============================================================
+
+ALTER TABLE public.booking_enquiries
+  ALTER COLUMN requester_id SET NOT NULL;
+
+ALTER TABLE public.booking_enquiries
+  ALTER COLUMN requester_type SET NOT NULL;
 
 ALTER TABLE public.booking_enquiries
   DROP CONSTRAINT IF EXISTS booking_enquiries_requester_check;
 
 ALTER TABLE public.booking_enquiries
   ADD CONSTRAINT booking_enquiries_requester_check CHECK (
-    (requester_type = 'business' AND business_id IS NOT NULL AND requester_id = business_id) OR
-    (requester_type = 'individual' AND business_id IS NULL AND requester_id IS NOT NULL)
+    requester_id IS NOT NULL AND
+    requester_type IS NOT NULL AND
+    (
+      (requester_type = 'business' AND business_id IS NOT NULL AND requester_id = business_id) OR
+      (requester_type = 'individual' AND business_id IS NULL)
+    )
   );
 
 -- ============================================================
@@ -156,6 +169,11 @@ BEGIN
   -- Ensure individual enquiries strictly have business_id IS NULL
   IF NEW.requester_type = 'individual' THEN
     NEW.business_id := NULL;
+  END IF;
+
+  -- Guard against NULL requester fields before constraint evaluation
+  IF NEW.requester_id IS NULL OR NEW.requester_type IS NULL THEN
+    RAISE EXCEPTION 'Requester integrity violation: requester_id and requester_type are required' USING ERRCODE = '23502';
   END IF;
 
   RETURN NEW;

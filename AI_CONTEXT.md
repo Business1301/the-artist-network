@@ -2035,11 +2035,11 @@ Four platform roles are now fully supported:
 ### 27.2 Implemented Architectural Components & Database Compatibility Corrections
 1. **Database Migration File Prepared (Review-Only):**
    - File: `supabase/migrations/20261125000000_individual_booking.sql`
-   - **Task 1: business_id nullability & requester constraint**: Safely executed `ALTER COLUMN business_id DROP NOT NULL`. Added `booking_enquiries_requester_check` constraint enforcing exact business vs individual field correlations (Business: `business_id IS NOT NULL AND requester_id = business_id`; Individual: `business_id IS NULL AND requester_id IS NOT NULL`).
+   - **Task 1: Requester Integrity Enforcement**: Enforced column-level `NOT NULL` on `requester_id` and `requester_type`. Updated `booking_enquiries_requester_check` constraint with explicit `requester_id IS NOT NULL AND requester_type IS NOT NULL` to eliminate PostgreSQL UNKNOWN evaluation bypass. Ensured backfill executes before NOT NULL and CHECK constraints are attached. Added explicit NULL guard in `populate_legacy_requester()` trigger function.
    - **Task 2: Shared concurrency protection**: Unified advisory lock key namespace to `'tan_enq_biz:' || v_requester_id::text` between v1 and v2, preventing lock hash collision/fragmentation between concurrent submissions.
-   - **Task 3: Idempotent backfill**: Added idempotent historical backfill `UPDATE public.booking_enquiries SET requester_id = business_id, requester_type = 'business' WHERE requester_id IS NULL AND business_id IS NOT NULL;`.
-   - **Task 4: Guest count persistence**: Added `guest_count INTEGER CHECK (guest_count IS NULL OR (guest_count > 0 AND guest_count <= 100000))` column. Added `p_guest_count INTEGER DEFAULT NULL` parameter to `submit_booking_enquiry_v2`. Traced and persisted end-to-end through Zod validation, RPC call, server action mappings, and UI presentation.
-   - **Task 5: Foreign key cascade & forward recovery**: Aligned `requester_id` foreign key on `ON DELETE CASCADE` matching `business_id` to eliminate constraint violations upon user deletion. Replaced destructive column drops with safe non-destructive forward recovery procedure.
+   - **Task 3: Preserved Duplicate Prevention**: Verified and preserved the strict duplicate check across same requester, target artist, and event date in `submit_booking_enquiry_v2`, preventing different `event_type` values from bypassing the duplicate rule.
+   - **Task 4: Guest count persistence & robust validation**: Added `guest_count INTEGER CHECK (guest_count IS NULL OR (guest_count > 0 AND guest_count <= 100000))` column and `p_guest_count` parameter. Hardened Zod schema with 17 edge cases (handles missing, null, empty, valid numeric strings, trims, rejects zero/negatives, decimals, > 100,000, and non-numerics). Traced and persisted end-to-end.
+   - **Task 5: Foreign key cascade analysis & forward recovery**: Analyzed foreign key dependency chain (`ON DELETE CASCADE` on requester/artist/business profiles vs audit events). Documented deliberate data-retention options (soft-delete vs archival vs hard delete). Replaced destructive column drops with safe non-destructive forward recovery procedure.
    - **Task 6: Standardized withdrawal**: Updated `withdraw_booking_enquiry_v2` and exported `canWithdrawStatus` helper permitting withdrawal from both open states and non-binding `'interested'` state, blocking only if `'declined'` or already `'withdrawn'`.
    - **Task 7: Security hardening**: Enforced `SECURITY DEFINER SET search_path = ''` on `handle_new_user()` auth trigger and all versioned RPCs. Explicitly verified caller role against `public.profiles.role` (fail-closed, never trust metadata). Revoked execute from PUBLIC and anon.
 2. **Server-Side Auth Guard:**
@@ -2063,9 +2063,9 @@ Four platform roles are now fully supported:
 - `npm run lint`: 0 errors (0 new warnings; 78 pre-existing warnings in `<img>` and legacy scratch scripts).
 - `npm run build`: 23/23 routes clean (Exit 0).
 - `npm audit --omit=dev`: 0 vulnerabilities.
-- Automated Test Suite (`scratch/test_phase_52b_individual.mjs`): **53 PASSED, 0 FAILED, 16 BLOCKED**.
-- **Task 8 Database Integration Tests**: 16 integration tests marked as **BLOCKED** due to no isolated test database being available; execution against production is strictly prohibited.
-- Local Git Commits: `45c292e`, `1b3ec32`.
+- Automated Test Suite (`scratch/test_phase_52b_individual.mjs`): **76 PASSED, 0 FAILED, 16 BLOCKED**.
+- **Task 5 Database Integration Tests**: Verified local Supabase CLI blocker (`docker: command not found`). 16 database integration tests accurately marked as **BLOCKED**; execution against production is strictly prohibited.
+- Local Git Commits: `45c292e`, `1b3ec32`, `50ff99c`.
 
 
 

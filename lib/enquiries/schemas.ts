@@ -87,10 +87,29 @@ export const submitEnquirySchema = z.object({
     .union([z.number(), z.string()])
     .optional()
     .nullable()
-    .transform((val) => {
-      if (val === undefined || val === null || val === "") return null;
-      const num = typeof val === "number" ? val : parseInt(val, 10);
-      return isNaN(num) ? null : num;
+    .transform((val, ctx) => {
+      if (val === undefined || val === null) return null;
+      if (typeof val === "string") {
+        const trimmed = val.trim();
+        if (trimmed === "") return null;
+        const num = Number(trimmed);
+        if (isNaN(num)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Number of guests must be a valid number",
+          });
+          return z.NEVER;
+        }
+        return num;
+      }
+      if (isNaN(val)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Number of guests must be a valid number",
+        });
+        return z.NEVER;
+      }
+      return val;
     })
     .pipe(
       z
