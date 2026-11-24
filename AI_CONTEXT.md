@@ -1871,6 +1871,50 @@ Post-Migration Live Results:
 - **RPC & RLS:** Extend `submit_booking_enquiry` and related RPCs to accept `role = 'individual'`, enforcing the identical 5-enquiries-per-hour rate limit.
 - **Strict Non-Binding Guardrails:** No payments, no escrow, no binding contracts, no automated booking. Everything remains an exploratory expression of interest.
 
+---
+
+## 25. Phase 5.2A — Verified Artist Feature Live Netlify Release (2026-11-24)
+
+### 25.1 Authorized Scope & Deployment Metadata
+- **Owner Authorization:** Granted on 2026-11-24 for Phase 5.2A (Verified Artist Visibility & Directory Filtering).
+- **Target Remote Branch:** `origin/master` (Target repo: `github.com/Business1301/the-artist-network.git`).
+- **Live Target Website:** `https://artist-net-v1.netlify.app`.
+- **Pre-Push Remote Baseline:** `85df6f9`.
+- **Deployed Commit:** `771b1bb` (encompassing `4836cbb` UI feature and `771b1bb` migration filename reconciliation).
+- **Push Method:** Fast-forward only (`85df6f9..771b1bb`), 0 merge commits, no force-push.
+- **Supabase Database Project:** `jmwkvrghquqqsfwierpj`.
+- **Database Status:** ZERO SQL executed during release. Remote database state strictly preserved.
+
+### 25.2 Pre-Deployment Quality Gates (All Passed)
+- `npx tsc --noEmit`: 0 errors.
+- `npm run lint`: 0 errors.
+- `npm run build`: 22/22 routes rendered cleanly.
+- `npm audit --omit=dev`: 0 vulnerabilities.
+- Focused acceptance suite (`scratch/test_verified_artist_acceptance.mjs`): 8/8 PASS.
+- Live Storage upload & CDN retrieval suite (`scratch/verify_e2e_upload.mjs`): PASS.
+
+### 25.3 Migration Ledger Reconciliation
+- Reconciled Storage RLS migration filename to `supabase/migrations/20261124061326_artist_media_storage_rls.sql` matching the exact remote ledger version `20261124061326` recorded in `supabase_migrations.schema_migrations`.
+- Confirmed Netlify build does not run Supabase CLI migrations (`netlify.toml` executes `npm run build` only).
+
+### 25.4 Live Post-Deployment Verification (HTTP 200 OK)
+Verified on `https://artist-net-v1.netlify.app`:
+1. `/` (Homepage): HTTP 200 OK ✅
+2. `/artists` (Directory): HTTP 200 OK; renders "Verified Only" toggle button and "Not Verified" badges on real unverified published artists ✅
+3. `/artists?verifiedOnly=true`: HTTP 200 OK; renders graceful empty state matching 0 verified artists in live database ✅
+4. `/artists/[slug]`: HTTP 200 OK; renders verification badge on hero overlay, stage name heading, and legal verification scope advisory notice ✅
+5. `/login` & `/signup`: HTTP 200 OK; role-aware authentication entry points fully operational ✅
+6. Supabase RLS on `booking_enquiries`: Strict isolation intact (anonymous read blocked: `permission denied for table booking_enquiries`) ✅
+7. Supabase Storage: Public CDN image serving active ✅
+
+### 25.5 Phase 5.2B Safety Hold
+Individual Booking database migration and UI implementation remain strictly on hold for platform owner review.
+- No Individual account roles created.
+- Legacy Business booking compatibility trigger prepared in specification.
+- Additive versioned RPC (`submit_booking_enquiry_v2`) prepared in specification.
+- Recovery freeze mode and `ON DELETE RESTRICT` data retention safeguards prepared.
+
+
 
 
 
