@@ -54,9 +54,9 @@ BEGIN
     assigned_role := 'artist';
   END IF;
 
-  user_full_name    := pg_catalog.coalesce(NEW.raw_user_meta_data->>'full_name', '');
-  user_biz_name     := pg_catalog.coalesce(NEW.raw_user_meta_data->>'business_name', '');
-  user_contact_name := pg_catalog.coalesce(NEW.raw_user_meta_data->>'contact_name', user_full_name);
+  user_full_name    := COALESCE(NEW.raw_user_meta_data->>'full_name', '');
+  user_biz_name     := COALESCE(NEW.raw_user_meta_data->>'business_name', '');
+  user_contact_name := COALESCE(NEW.raw_user_meta_data->>'contact_name', user_full_name);
 
   -- Insert profile with validated role
   INSERT INTO public.profiles (id, role, full_name)

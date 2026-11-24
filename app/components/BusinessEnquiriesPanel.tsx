@@ -7,6 +7,7 @@ import {
   BookingEnquiryStatus,
   BookingEventType,
   isPastEventDate,
+  isOpenStatus,
   isTerminalStatus,
   canWithdrawStatus,
 } from "@/lib/enquiries/types";
@@ -255,11 +256,10 @@ export default function BusinessEnquiriesPanel({
       {/* Feedback Notice */}
       {feedbackNotice && (
         <div
-          className={`p-3 rounded-xl text-xs font-semibold flex items-center justify-between gap-2 ${
-            feedbackNotice.type === "success"
-              ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-              : "bg-red-50 text-red-800 border border-red-200"
-          }`}
+          className={`p-3 rounded-xl text-xs font-semibold flex items-center justify-between gap-2 ${feedbackNotice.type === "success"
+            ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+            : "bg-red-50 text-red-800 border border-red-200"
+            }`}
         >
           <span>{feedbackNotice.type === "success" ? "✓ " : "⚠ "}{feedbackNotice.message}</span>
           <button
@@ -288,13 +288,12 @@ export default function BusinessEnquiriesPanel({
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                activeTab === tab.id
-                  ? "bg-purple-600 text-white shadow-xs"
-                  : tab.urgent && tab.count > 0
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${activeTab === tab.id
+                ? "bg-purple-600 text-white shadow-xs"
+                : tab.urgent && tab.count > 0
                   ? "bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100"
                   : "bg-gray-50 text-gray-700 hover:bg-gray-100"
-              }`}
+                }`}
             >
               <span>{tab.label}</span>
               {tab.urgent && tab.count > 0 ? (
@@ -348,6 +347,7 @@ export default function BusinessEnquiriesPanel({
               const isExpanded = expandedId === enq.id;
               const badge = getStatusBadge(enq.status);
               const isPast = isPastEventDate(enq.event_date);
+              const isOpen = isOpenStatus(enq.status);
               const isTerminal = isTerminalStatus(enq.status);
               const canClarify = enq.status === "info_requested";
               const canWithdraw = canWithdrawStatus(enq.status);
@@ -501,19 +501,18 @@ export default function BusinessEnquiriesPanel({
 
                       {/* Artist's question (info_requested) */}
                       {enq.artist_response && (
-                        <div className={`p-3 rounded-xl border ${
-                          enq.status === "info_requested"
-                            ? "bg-amber-50 border-amber-200"
-                            : "bg-gray-50 border-gray-100"
-                        }`}>
+                        <div className={`p-3 rounded-xl border ${enq.status === "info_requested"
+                          ? "bg-amber-50 border-amber-200"
+                          : "bg-gray-50 border-gray-100"
+                          }`}>
                           <p className="text-[11px] font-semibold text-gray-600 uppercase tracking-wider mb-1">
                             {enq.status === "info_requested"
                               ? "🎵 Artist's Question — Reply Required"
                               : enq.status === "interested"
-                              ? "🎵 Artist's Interest Note"
-                              : enq.status === "declined"
-                              ? "🎵 Artist's Response"
-                              : "🎵 Artist Response"}
+                                ? "🎵 Artist's Interest Note"
+                                : enq.status === "declined"
+                                  ? "🎵 Artist's Response"
+                                  : "🎵 Artist Response"}
                           </p>
                           <p className="text-xs text-gray-800 whitespace-pre-wrap">{enq.artist_response}</p>
                         </div>
@@ -534,13 +533,12 @@ export default function BusinessEnquiriesPanel({
 
                       {/* Terminal state summary */}
                       {isTerminal && (
-                        <div className={`p-3 rounded-xl border text-xs ${
-                          enq.status === "interested"
-                            ? "bg-emerald-50 border-emerald-100 text-emerald-900"
-                            : enq.status === "declined"
+                        <div className={`p-3 rounded-xl border text-xs ${enq.status === "interested"
+                          ? "bg-emerald-50 border-emerald-100 text-emerald-900"
+                          : enq.status === "declined"
                             ? "bg-red-50 border-red-100 text-red-900"
                             : "bg-gray-50 border-gray-100 text-gray-700"
-                        }`}>
+                          }`}>
                           {enq.status === "interested" && "This enquiry has concluded with the artist expressing non-binding interest. No booking or payment has been created."}
                           {enq.status === "declined" && "The artist declined this enquiry. You may send a new enquiry to a different artist."}
                           {enq.status === "withdrawn" && "You withdrew this enquiry. The enquiry history is preserved."}

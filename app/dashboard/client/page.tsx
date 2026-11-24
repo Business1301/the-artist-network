@@ -8,6 +8,7 @@ import {
   BookingEnquiryWithDetails,
   BookingEnquiryStatus,
   BookingEventType,
+  isOpenStatus,
   isTerminalStatus,
   canWithdrawStatus,
 } from "@/lib/enquiries/types";
@@ -243,11 +244,10 @@ export default function ClientDashboardPage() {
         {/* Feedback Alert */}
         {feedback && (
           <div
-            className={`mb-6 p-4 rounded-2xl flex items-start justify-between gap-3 text-xs sm:text-sm font-semibold border ${
-              feedback.type === "success"
-                ? "bg-emerald-50 text-emerald-900 border-emerald-200"
-                : "bg-rose-50 text-rose-900 border-rose-200"
-            }`}
+            className={`mb-6 p-4 rounded-2xl flex items-start justify-between gap-3 text-xs sm:text-sm font-semibold border ${feedback.type === "success"
+              ? "bg-emerald-50 text-emerald-900 border-emerald-200"
+              : "bg-rose-50 text-rose-900 border-rose-200"
+              }`}
           >
             <div className="flex items-center gap-2">
               <span>{feedback.type === "success" ? "✓" : "⚠️"}</span>
@@ -318,20 +318,18 @@ export default function ClientDashboardPage() {
           </div>
 
           <div
-            className={`p-5 rounded-2xl border shadow-xs ${
-              actionNeededCount > 0
-                ? "bg-amber-50/70 border-amber-300"
-                : "bg-white border-gray-200"
-            }`}
+            className={`p-5 rounded-2xl border shadow-xs ${actionNeededCount > 0
+              ? "bg-amber-50/70 border-amber-300"
+              : "bg-white border-gray-200"
+              }`}
           >
             <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-1">
               Action Needed
             </span>
             <div className="flex items-baseline gap-2">
               <span
-                className={`text-2xl sm:text-3xl font-black ${
-                  actionNeededCount > 0 ? "text-amber-600" : "text-gray-900"
-                }`}
+                className={`text-2xl sm:text-3xl font-black ${actionNeededCount > 0 ? "text-amber-600" : "text-gray-900"
+                  }`}
               >
                 {isLoading ? "..." : actionNeededCount}
               </span>
@@ -394,11 +392,10 @@ export default function ClientDashboardPage() {
           <button
             type="button"
             onClick={() => setActiveTab("all")}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === "all"
-                ? "bg-purple-600 text-white shadow-xs"
-                : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
-            }`}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "all"
+              ? "bg-purple-600 text-white shadow-xs"
+              : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+              }`}
           >
             All Enquiries ({enquiries.length})
           </button>
@@ -406,11 +403,10 @@ export default function ClientDashboardPage() {
           <button
             type="button"
             onClick={() => setActiveTab("action_needed")}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              activeTab === "action_needed"
-                ? "bg-purple-600 text-white shadow-xs"
-                : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
-            }`}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${activeTab === "action_needed"
+              ? "bg-purple-600 text-white shadow-xs"
+              : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+              }`}
           >
             <span>Action Needed</span>
             {actionNeededCount > 0 && (
@@ -423,11 +419,10 @@ export default function ClientDashboardPage() {
           <button
             type="button"
             onClick={() => setActiveTab("interested")}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === "interested"
-                ? "bg-purple-600 text-white shadow-xs"
-                : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
-            }`}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "interested"
+              ? "bg-purple-600 text-white shadow-xs"
+              : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+              }`}
           >
             Artist Interested ({interestedCount})
           </button>
@@ -435,11 +430,10 @@ export default function ClientDashboardPage() {
           <button
             type="button"
             onClick={() => setActiveTab("awaiting_artist")}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === "awaiting_artist"
-                ? "bg-purple-600 text-white shadow-xs"
-                : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
-            }`}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "awaiting_artist"
+              ? "bg-purple-600 text-white shadow-xs"
+              : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+              }`}
           >
             Awaiting Artist ({awaitingArtistCount})
           </button>
@@ -447,11 +441,10 @@ export default function ClientDashboardPage() {
           <button
             type="button"
             onClick={() => setActiveTab("concluded")}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              activeTab === "concluded"
-                ? "bg-purple-600 text-white shadow-xs"
-                : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
-            }`}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeTab === "concluded"
+              ? "bg-purple-600 text-white shadow-xs"
+              : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+              }`}
           >
             Concluded ({concludedCount})
           </button>
@@ -479,12 +472,12 @@ export default function ClientDashboardPage() {
               {activeTab === "action_needed"
                 ? "No Action Needed"
                 : activeTab === "interested"
-                ? "No Interested Responses Yet"
-                : activeTab === "awaiting_artist"
-                ? "No Enquiries Awaiting Artists"
-                : activeTab === "concluded"
-                ? "No Concluded Enquiries"
-                : "You Haven't Sent Any Enquiries Yet"}
+                  ? "No Interested Responses Yet"
+                  : activeTab === "awaiting_artist"
+                    ? "No Enquiries Awaiting Artists"
+                    : activeTab === "concluded"
+                      ? "No Concluded Enquiries"
+                      : "You Haven't Sent Any Enquiries Yet"}
             </h3>
             <p className="text-xs sm:text-sm text-gray-500 max-w-md mx-auto leading-relaxed">
               Explore our curated roster of verified musicians, singers, dancers, and performers to plan your special event.
@@ -516,11 +509,10 @@ export default function ClientDashboardPage() {
               return (
                 <div
                   key={enquiry.id}
-                  className={`bg-white rounded-2xl border transition-all overflow-hidden ${
-                    enquiry.status === "info_requested"
-                      ? "border-amber-300 shadow-sm ring-1 ring-amber-200"
-                      : "border-gray-200/90 shadow-xs"
-                  }`}
+                  className={`bg-white rounded-2xl border transition-all overflow-hidden ${enquiry.status === "info_requested"
+                    ? "border-amber-300 shadow-sm ring-1 ring-amber-200"
+                    : "border-gray-200/90 shadow-xs"
+                    }`}
                 >
                   {/* Card Header (Clickable) */}
                   <div
