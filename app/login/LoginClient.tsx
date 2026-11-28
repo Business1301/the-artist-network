@@ -2,7 +2,6 @@
 
 import { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { signInAction, resetPasswordAction } from "@/app/auth/actions";
@@ -14,7 +13,6 @@ interface LoginClientProps {
 }
 
 function LoginForm({ redirectTo, isUnauthorized }: LoginClientProps) {
-  const router = useRouter();
   const configured = isSupabaseConfigured();
 
   const [email, setEmail] = useState("");
@@ -73,11 +71,11 @@ function LoginForm({ redirectTo, isUnauthorized }: LoginClientProps) {
       setPassword("");
 
       if (res.success && res.redirectTo) {
-        if (res.user && typeof window !== "undefined") {
-          localStorage.setItem("tan_auth_user", JSON.stringify(res.user));
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("tan_auth_user");
         }
         setNotice({ message: res.message || "Login successful! Redirecting..." });
-        router.push(res.redirectTo);
+        window.location.assign(res.redirectTo);
       } else {
         setNotice({ message: res.message || "Unable to sign in.", error: true });
       }

@@ -21,6 +21,12 @@ export function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
     "placeholder-key";
 
-  return createBrowserClient(url, key);
+  return createBrowserClient(url, key, {
+    auth: {
+      // Never auto-consume session credentials from shareable URLs in browser JS.
+      // Email verification and password recovery go through /auth/callback server-side.
+      detectSessionInUrl: false,
+    },
+  });
 }
 

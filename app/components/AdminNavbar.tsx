@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { signOutAction } from "@/app/auth/actions";
 
@@ -12,7 +12,6 @@ interface AdminNavbarProps {
 
 export default function AdminNavbar({ adminName, adminEmail }: AdminNavbarProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
@@ -28,8 +27,7 @@ export default function AdminNavbar({ adminName, adminEmail }: AdminNavbarProps)
       localStorage.removeItem("tan_auth_user");
     }
     await signOutAction();
-    router.push("/login");
-    router.refresh();
+    window.location.replace(`${window.location.origin}/login`);
   };
 
   return (
@@ -67,11 +65,10 @@ export default function AdminNavbar({ adminName, adminEmail }: AdminNavbarProps)
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
-                    isActive
-                      ? "bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs font-bold"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                  }`}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${isActive
+                    ? "bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs font-bold"
+                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                    }`}
                 >
                   <span>{link.icon}</span>
                   <span>{link.label}</span>
@@ -135,11 +132,10 @@ export default function AdminNavbar({ adminName, adminEmail }: AdminNavbarProps)
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold ${
-                  isActive
-                    ? "bg-purple-50 text-purple-700 font-bold border border-purple-200"
-                    : "text-gray-700 hover:bg-gray-100"
-                }`}
+                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold ${isActive
+                  ? "bg-purple-50 text-purple-700 font-bold border border-purple-200"
+                  : "text-gray-700 hover:bg-gray-100"
+                  }`}
               >
                 <span>{link.icon}</span>
                 <span>{link.label}</span>

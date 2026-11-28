@@ -54,11 +54,12 @@ export interface ArtistProfileResponse {
 }
 
 /**
- * Fetch the current authenticated artist's private profile & portfolio
+ * Shared server-side artist verification helper.
+ * Verifies authenticated Supabase user AND confirms role === 'artist' in public.profiles.
  */
-export async function getArtistProfile(): Promise<ArtistProfileResponse> {
+async function requireArtistActionSession() {
   if (!isSupabaseConfigured()) {
-    return { success: false, message: "Database not configured." };
+    return { supabase: null, user: null, message: "Database not configured." };
   }
 
   const supabase = await createClient();
@@ -67,7 +68,29 @@ export async function getArtistProfile(): Promise<ArtistProfileResponse> {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { success: false, message: "Authentication required." };
+    return { supabase, user: null, message: "Unauthorized. Please log in." };
+  }
+
+  const { data: profileRow, error: roleErr } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (roleErr || !profileRow || profileRow.role !== "artist") {
+    return { supabase, user: null, message: "Artist account required." };
+  }
+
+  return { supabase, user, message: null };
+}
+
+/**
+ * Fetch the current authenticated artist's private profile & portfolio
+ */
+export async function getArtistProfile(): Promise<ArtistProfileResponse> {
+  const { supabase, user, message } = await requireArtistActionSession();
+  if (!supabase || !user) {
+    return { success: false, message: message || "Authentication required." };
   }
 
   const { data: profile, error } = await supabase
@@ -104,17 +127,9 @@ export async function getArtistProfile(): Promise<ArtistProfileResponse> {
 export async function saveArtistProfile(
   formData: Partial<ArtistProfileData>
 ): Promise<ArtistProfileResponse> {
-  if (!isSupabaseConfigured()) {
-    return { success: false, message: "Database not configured." };
-  }
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, message: "Unauthorized. Please log in." };
+  const { supabase, user, message } = await requireArtistActionSession();
+  if (!supabase || !user) {
+    return { success: false, message: message || "Unauthorized. Please log in." };
   }
 
   // Block suspended artists from editing (defense-in-depth; DB trigger also enforces this)
@@ -228,17 +243,9 @@ export async function publishProfile(): Promise<{
   success: boolean;
   message: string;
 }> {
-  if (!isSupabaseConfigured()) {
-    return { success: false, message: "Database not configured." };
-  }
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, message: "Unauthorized. Please log in." };
+  const { supabase, user, message } = await requireArtistActionSession();
+  if (!supabase || !user) {
+    return { success: false, message: message || "Unauthorized. Please log in." };
   }
 
   // 1. Fetch current profile to validate completeness
@@ -315,17 +322,9 @@ export async function unpublishProfile(): Promise<{
   success: boolean;
   message: string;
 }> {
-  if (!isSupabaseConfigured()) {
-    return { success: false, message: "Database not configured." };
-  }
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, message: "Unauthorized. Please log in." };
+  const { supabase, user, message } = await requireArtistActionSession();
+  if (!supabase || !user) {
+    return { success: false, message: message || "Unauthorized. Please log in." };
   }
 
   // 1. Fetch current profile
@@ -391,7 +390,15 @@ export async function getPublicArtistBySlug(slug: string): Promise<{
     return { profile: null, portfolio: [], isOwnerPreview: false };
   }
 
-  const isOwner = Boolean(user && user.id === profile.id);
+  let isOwner = false;
+  if (user && user.id === profile.id) {
+    const { data: roleRow } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    isOwner = roleRow?.role === "artist";
+  }
 
   // If not published and not the owner, hide it completely (404 / null)
   if (profile.profile_status !== "published" && !isOwner) {
@@ -422,17 +429,9 @@ export async function addPortfolioItem(item: {
   media_url: string;
   thumbnail_url?: string;
 }): Promise<{ success: boolean; message?: string; item?: PortfolioItemData }> {
-  if (!isSupabaseConfigured()) {
-    return { success: false, message: "Database not configured." };
-  }
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, message: "Unauthorized." };
+  const { supabase, user, message } = await requireArtistActionSession();
+  if (!supabase || !user) {
+    return { success: false, message: message || "Unauthorized." };
   }
 
   // Block suspended artists (defense-in-depth; RLS also enforces)
@@ -486,17 +485,9 @@ export async function addPortfolioItem(item: {
 export async function deletePortfolioItem(
   itemId: string
 ): Promise<{ success: boolean; message?: string }> {
-  if (!isSupabaseConfigured()) {
-    return { success: false, message: "Database not configured." };
-  }
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, message: "Unauthorized." };
+  const { supabase, user, message } = await requireArtistActionSession();
+  if (!supabase || !user) {
+    return { success: false, message: message || "Unauthorized." };
   }
 
   // Block suspended artists (defense-in-depth; RLS also enforces)
@@ -528,17 +519,13 @@ export async function deletePortfolioItem(
 export async function reorderPortfolioItems(
   orderedIds: string[]
 ): Promise<{ success: boolean; message?: string }> {
-  if (!isSupabaseConfigured() || orderedIds.length === 0) {
+  if (orderedIds.length === 0) {
     return { success: false, message: "Invalid request." };
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, message: "Unauthorized." };
+  const { supabase, user, message } = await requireArtistActionSession();
+  if (!supabase || !user) {
+    return { success: false, message: message || "Unauthorized." };
   }
 
   // Update display_order for each item

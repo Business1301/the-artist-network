@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { getCurrentUser, signOutAction, type CurrentUser } from "@/app/auth/actions";
 
 export type NavbarUser = CurrentUser;
@@ -20,7 +19,6 @@ const navLinks = [
 ];
 
 export default function Navbar({ initialUser }: NavbarProps) {
-  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -48,13 +46,11 @@ export default function Navbar({ initialUser }: NavbarProps) {
 
   // ── Sync effect: runs ONLY on client after hydration is complete ──
   useEffect(() => {
-    // If SSR provided a definitive user value, sync to localStorage
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("tan_auth_user");
+    }
+
     if (initialUser !== undefined) {
-      if (initialUser) {
-        localStorage.setItem("tan_auth_user", JSON.stringify(initialUser));
-      } else {
-        localStorage.removeItem("tan_auth_user");
-      }
       return;
     }
 
@@ -70,11 +66,6 @@ export default function Navbar({ initialUser }: NavbarProps) {
       .then((verified) => {
         if (!isMounted) return;
         setUser(verified);
-        if (verified) {
-          localStorage.setItem("tan_auth_user", JSON.stringify(verified));
-        } else {
-          localStorage.removeItem("tan_auth_user");
-        }
       })
       .catch(() => {
         if (isMounted) setUser(null);
@@ -83,7 +74,7 @@ export default function Navbar({ initialUser }: NavbarProps) {
     return () => {
       isMounted = false;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialUserId]);
 
   const handleSignOut = async () => {
@@ -97,13 +88,16 @@ export default function Navbar({ initialUser }: NavbarProps) {
 
     if (typeof window !== "undefined") {
       localStorage.removeItem("tan_auth_user");
+      setUser(null);
+      setIsLoggingOut(false);
+      setMenuOpen(false);
+      window.location.replace(`${window.location.origin}/`);
+      return;
     }
 
     setUser(null);
     setIsLoggingOut(false);
     setMenuOpen(false);
-    router.push("/");
-    router.refresh();
   };
 
   const getDashboardDestination = (role?: string) => {
@@ -161,15 +155,14 @@ export default function Navbar({ initialUser }: NavbarProps) {
               <div className="hidden sm:flex items-center gap-3">
                 <Link
                   href={dashboard.href}
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-white font-bold text-xs shadow-xs transition-colors ${
-                    user.role === "admin"
-                      ? "bg-purple-600 hover:bg-purple-700"
-                      : user.role === "business"
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-white font-bold text-xs shadow-xs transition-colors ${user.role === "admin"
+                    ? "bg-purple-600 hover:bg-purple-700"
+                    : user.role === "business"
                       ? "bg-emerald-600 hover:bg-emerald-700"
                       : user.role === "individual"
-                      ? "bg-indigo-600 hover:bg-indigo-700"
-                      : "bg-blue-600 hover:bg-blue-700"
-                  }`}
+                        ? "bg-indigo-600 hover:bg-indigo-700"
+                        : "bg-blue-600 hover:bg-blue-700"
+                    }`}
                 >
                   <span>{dashboard.badge}</span>
                   <span>{dashboard.label}</span>
@@ -263,15 +256,14 @@ export default function Navbar({ initialUser }: NavbarProps) {
                 <Link
                   href={dashboard.href}
                   onClick={() => setMenuOpen(false)}
-                  className={`w-full text-center py-2.5 rounded-xl text-white text-sm font-bold shadow-xs transition-colors ${
-                    user.role === "admin"
-                      ? "bg-purple-600 hover:bg-purple-700"
-                      : user.role === "business"
+                  className={`w-full text-center py-2.5 rounded-xl text-white text-sm font-bold shadow-xs transition-colors ${user.role === "admin"
+                    ? "bg-purple-600 hover:bg-purple-700"
+                    : user.role === "business"
                       ? "bg-emerald-600 hover:bg-emerald-700"
                       : user.role === "individual"
-                      ? "bg-indigo-600 hover:bg-indigo-700"
-                      : "bg-blue-600 hover:bg-blue-700"
-                  }`}
+                        ? "bg-indigo-600 hover:bg-indigo-700"
+                        : "bg-blue-600 hover:bg-blue-700"
+                    }`}
                 >
                   {dashboard.badge} {dashboard.label}
                 </Link>

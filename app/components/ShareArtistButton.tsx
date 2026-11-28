@@ -12,7 +12,8 @@ export default function ShareArtistButton({ title }: ShareArtistButtonProps) {
   const handleShare = async () => {
     if (typeof window === "undefined") return;
 
-    const url = window.location.href;
+    // Copy strictly canonical origin + path without query strings or hash fragments
+    const url = `${window.location.origin}${window.location.pathname}`;
 
     if (navigator.share) {
       try {

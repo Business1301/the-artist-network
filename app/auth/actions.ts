@@ -1,8 +1,19 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/server";
+import { getServerActionSiteOrigin } from "@/lib/auth/origin";
 import { getSafeRedirectPath } from "@/lib/auth/redirect";
+
+async function getTrustedSiteUrl(): Promise<string> {
+  try {
+    const hdrs = await headers();
+    const directHost = hdrs.get("host")?.split(",")[0]?.trim() || null;
+    return getServerActionSiteOrigin(directHost);
+  } catch {
+    return getServerActionSiteOrigin(null);
+  }
+}
 
 export interface CurrentUser {
   id: string;
@@ -69,11 +80,14 @@ export async function signUpAction(formData: {
     metaData.full_name = contactName || businessName || "";
   }
 
+  const siteUrl = await getTrustedSiteUrl();
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: metaData,
+      ...(siteUrl ? { emailRedirectTo: `${siteUrl}/auth/callback` } : {}),
     },
   });
 
@@ -223,8 +237,11 @@ export async function resetPasswordAction(email: string): Promise<AuthResponse> 
   }
 
   const supabase = await createClient();
+  const siteUrl = await getTrustedSiteUrl();
 
-  const { error } = await supabase.auth.resetPasswordForEmail(email);
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${siteUrl}/auth/callback`,
+  });
 
   if (error) {
     return {
@@ -243,18 +260,24 @@ export async function resetPasswordAction(email: string): Promise<AuthResponse> 
  * Server action for User Logout
  */
 export async function signOutAction(): Promise<AuthResponse> {
-  if (!isSupabaseConfigured()) {
-    return {
-      success: true,
-      redirectTo: "/",
-    };
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      await supabase.auth.signOut();
+    } catch {
+      // Proceed to clear local session cookies cleanly even if remote revoke fails
+    }
   }
 
   try {
-    const supabase = await createClient();
-    await supabase.auth.signOut();
+    const cookieStore = await cookies();
+    for (const c of cookieStore.getAll()) {
+      if (c.name.startsWith("sb-") || c.name.includes("-auth-token")) {
+        cookieStore.set(c.name, "", { path: "/", maxAge: 0 });
+      }
+    }
   } catch {
-    // If remote signOut fails or network is down, still allow client to proceed with local logout
+    // Ignore cookie clearing errors outside request context
   }
 
   return {
@@ -266,13 +289,6 @@ export async function signOutAction(): Promise<AuthResponse> {
 /**
  * Server helper to get current session and user profile
  */
-export interface CurrentUser {
-  id: string;
-  email?: string;
-  role: "admin" | "artist" | "business" | "individual" | string;
-  fullName: string;
-}
-
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   if (!isSupabaseConfigured()) {
     return null;

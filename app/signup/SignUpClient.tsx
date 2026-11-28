@@ -2,7 +2,6 @@
 
 import { useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { signUpAction } from "@/app/auth/actions";
@@ -14,7 +13,6 @@ interface SignUpClientProps {
 }
 
 function SignUpForm({ initialRole = "artist", redirectTo }: SignUpClientProps) {
-  const router = useRouter();
   const configured = isSupabaseConfigured();
 
   const [role, setRole] = useState<"artist" | "business" | "individual">(initialRole);
@@ -104,10 +102,10 @@ function SignUpForm({ initialRole = "artist", redirectTo }: SignUpClientProps) {
         if (res.needsEmailConfirmation) {
           setEmailConfirmationRequired(true);
         } else if (res.redirectTo || redirectTo) {
-          if (res.user && typeof window !== "undefined") {
-            localStorage.setItem("tan_auth_user", JSON.stringify(res.user));
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("tan_auth_user");
           }
-          router.push(redirectTo || res.redirectTo || "/");
+          window.location.assign(redirectTo || res.redirectTo || "/");
         } else {
           setNotice({ message: res.message || "Registration successful!" });
         }

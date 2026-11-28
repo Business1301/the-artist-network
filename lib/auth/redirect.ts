@@ -22,13 +22,22 @@ export function getSafeRedirectPath(
 
   const trimmed = requestedPath.trim();
 
-  // Must begin with single forward slash and must not contain //, \, or control characters
+  // Must begin with single forward slash and must not contain //, \, control characters, or cross-origin ambiguity
   if (
     !trimmed.startsWith("/") ||
     trimmed.startsWith("//") ||
     trimmed.includes("\\") ||
-    trimmed.includes("\0")
+    /[\x00-\x1f\x7f]/.test(trimmed)
   ) {
+    return defaultPath;
+  }
+
+  try {
+    const resolved = new URL(trimmed, "https://artist-net-v1.netlify.app");
+    if (resolved.origin !== "https://artist-net-v1.netlify.app") {
+      return defaultPath;
+    }
+  } catch {
     return defaultPath;
   }
 

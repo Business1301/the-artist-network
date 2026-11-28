@@ -173,13 +173,7 @@ export default async function PrivacyPage() {
                     <tr>
                       <td className="px-4 py-2.5 font-mono text-[11px]">sb-*-auth-token</td>
                       <td className="px-4 py-2.5">Supabase Auth (@supabase/ssr)</td>
-                      <td className="px-4 py-2.5">Maintains your authenticated session across server navigation and API requests.</td>
-                      <td className="px-4 py-2.5 text-purple-700 font-semibold">Strictly Essential</td>
-                    </tr>
-                    <tr>
-                      <td className="px-4 py-2.5 font-mono text-[11px]">localStorage (tan_auth_user)</td>
-                      <td className="px-4 py-2.5">First-party (Browser)</td>
-                      <td className="px-4 py-2.5">Caches non-sensitive UI role state to prevent screen flicker during page transitions.</td>
+                      <td className="px-4 py-2.5">Maintains your strictly per-session authenticated cookies across server navigation and API requests.</td>
                       <td className="px-4 py-2.5 text-purple-700 font-semibold">Strictly Essential</td>
                     </tr>
                     <tr>
