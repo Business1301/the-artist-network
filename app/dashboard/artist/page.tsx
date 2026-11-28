@@ -6,8 +6,11 @@ import { useRouter } from "next/navigation";
 
 import { getArtistProfile, ArtistProfileData, PortfolioItemData } from "@/app/actions/artist";
 import { getArtistEnquiriesAction } from "@/app/actions/enquiries";
+import { getArtistGigApplicationsAction } from "@/app/actions/businessGigs";
 import { BookingEnquiryWithDetails } from "@/lib/enquiries/types";
+import type { ArtistGigApplicationItem } from "@/lib/gigs/types";
 import ArtistEnquiriesInbox from "@/app/components/ArtistEnquiriesInbox";
+import ArtistGigApplicationsPanel from "@/app/components/artist/ArtistGigApplicationsPanel";
 import { createClient } from "@/lib/supabase/client";
 
 // Completeness field definitions — each has a key, label, weight, and check function
@@ -31,7 +34,9 @@ const COMPLETENESS_FIELDS: CompletenessField[] = [
 
 export default function ArtistDashboardPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"overview" | "portfolio" | "enquiries">("overview");
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "portfolio" | "enquiries" | "applications"
+  >("overview");
 
   // Real Database State
   const [isLoading, setIsLoading] = useState(true);
@@ -39,10 +44,11 @@ export default function ArtistDashboardPage() {
   const [profile, setProfile] = useState<ArtistProfileData | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioItemData[]>([]);
   const [enquiries, setEnquiries] = useState<BookingEnquiryWithDetails[]>([]);
+  const [gigApplications, setGigApplications] = useState<ArtistGigApplicationItem[]>([]);
 
   useEffect(() => {
+    let active = true;
     async function loadData() {
-      setIsLoading(true);
       const supabase = createClient();
       const {
         data: { user },
@@ -54,13 +60,16 @@ export default function ArtistDashboardPage() {
         return;
       }
 
+      if (!active) return;
       setUserEmail(user.email || null);
 
-      const [res, enqRes] = await Promise.all([
+      const [res, enqRes, appsRes] = await Promise.all([
         getArtistProfile(),
         getArtistEnquiriesAction({ status: "all", limit: 50 }),
+        getArtistGigApplicationsAction(),
       ]);
 
+      if (!active) return;
       if (res.success) {
         setProfile(res.profile || null);
         setPortfolio(res.portfolio || []);
@@ -68,11 +77,17 @@ export default function ArtistDashboardPage() {
       if (enqRes.success && enqRes.data) {
         setEnquiries(enqRes.data);
       }
+      if (appsRes.success && appsRes.data) {
+        setGigApplications(appsRes.data);
+      }
 
       setIsLoading(false);
     }
 
     loadData();
+    return () => {
+      active = false;
+    };
   }, [router]);
 
   // Calculate real completion score (0 to 100%) based strictly on completed fields
@@ -331,7 +346,7 @@ export default function ArtistDashboardPage() {
           )}
 
         {/* KPI Cards — Only real database data */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 sm:gap-4 mb-8">
           {/* 1. Enquiries Card */}
           <div
             onClick={() => setActiveTab("enquiries")}
@@ -353,7 +368,36 @@ export default function ArtistDashboardPage() {
             </div>
           </div>
 
-          {/* 2. Portfolio Items */}
+          {/* 2. Gig Applications Card */}
+          <div
+            onClick={() => setActiveTab("applications")}
+            className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm hover:border-purple-300 hover:shadow-md transition-all cursor-pointer group"
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-medium text-gray-500">Gig Applications</span>
+              {gigApplications.some((a) => a.application_status === "shortlisted") && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-emerald-600 text-white">
+                  Shortlisted
+                </span>
+              )}
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl sm:text-3xl font-extrabold text-gray-900 group-hover:text-purple-600 transition-colors">
+                {
+                  gigApplications.filter(
+                    (a) =>
+                      a.application_status === "submitted" ||
+                      a.application_status === "shortlisted"
+                  ).length
+                }
+              </span>
+              <span className="text-[11px] font-semibold text-purple-600">
+                of {gigApplications.length} applied
+              </span>
+            </div>
+          </div>
+
+          {/* 3. Portfolio Items */}
           <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
             <span className="text-xs font-medium text-gray-500 block mb-1">Portfolio Items</span>
             <div className="flex items-baseline gap-2">
@@ -364,7 +408,7 @@ export default function ArtistDashboardPage() {
             </div>
           </div>
 
-          {/* 3. Indicative Fee */}
+          {/* 4. Indicative Fee */}
           <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
             <span className="text-xs font-medium text-gray-500 block mb-1">Starting Rate</span>
             <div className="flex items-baseline gap-2">
@@ -374,7 +418,7 @@ export default function ArtistDashboardPage() {
             </div>
           </div>
 
-          {/* 4. Profile Status */}
+          {/* 5. Profile Status */}
           <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
             <span className="text-xs font-medium text-gray-500 block mb-1">Profile Status</span>
             <div className="flex items-baseline gap-2">
@@ -384,8 +428,8 @@ export default function ArtistDashboardPage() {
             </div>
           </div>
 
-          {/* 5. Profile Completion */}
-          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm col-span-2 lg:col-span-1">
+          {/* 6. Profile Completion */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
             <span className="text-xs font-medium text-gray-500 block mb-1">Profile Completion</span>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl sm:text-3xl font-extrabold text-gray-900">{completeness}%</span>
@@ -405,6 +449,21 @@ export default function ArtistDashboardPage() {
             }`}
           >
             Overview &amp; Actions
+          </button>
+          <button
+            onClick={() => setActiveTab("applications")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === "applications"
+                ? "bg-purple-600 text-white shadow-sm"
+                : "bg-white text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            <span>Gig Applications</span>
+            {gigApplications.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-700">
+                {gigApplications.length}
+              </span>
+            )}
           </button>
           <button
             onClick={() => setActiveTab("enquiries")}
@@ -589,6 +648,44 @@ export default function ArtistDashboardPage() {
               )}
             </div>
 
+            {/* Business Gigs & Applications — Live */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm hover:border-purple-200 transition-all">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-lg">
+                    🎤
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-gray-900">Business Gigs Board</h3>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                        Artist Only
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Browse private venue openings posted by businesses and track your applications
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("applications")}
+                    className="px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    My Applications ({gigApplications.length})
+                  </button>
+                  <Link
+                    href="/opportunities/business-gigs"
+                    className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition-colors"
+                  >
+                    Browse Gigs →
+                  </Link>
+                </div>
+              </div>
+            </div>
+
             {/* Gig Schedule & Calendar — Live */}
             <Link
               href="/dashboard/artist/calendar"
@@ -685,6 +782,14 @@ export default function ArtistDashboardPage() {
         {/* TAB 3: Booking Enquiries Inbox */}
         {activeTab === "enquiries" && (
           <ArtistEnquiriesInbox initialEnquiries={enquiries} />
+        )}
+
+        {/* TAB 4: Business Gig Applications */}
+        {activeTab === "applications" && (
+          <ArtistGigApplicationsPanel
+            initialApplications={gigApplications}
+            onCountChange={(apps) => setGigApplications(apps)}
+          />
         )}
       </div>
     </main>

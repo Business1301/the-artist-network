@@ -1,12 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { getBusinessEnquiriesAction } from "@/app/actions/enquiries";
 import { BookingEnquiryWithDetails } from "@/lib/enquiries/types";
 import BusinessEnquiriesPanel from "@/app/components/BusinessEnquiriesPanel";
+import { getBusinessPostedGigsAction } from "@/app/actions/businessGigs";
+import type { BusinessPostedGig } from "@/lib/gigs/types";
+import GigFormModal from "@/app/components/business/GigFormModal";
+import BusinessGigsManager from "@/app/components/business/BusinessGigsManager";
 
 // ⚠️ MOCK DEMONSTRATION DATA for non-enquiry sections only
 // (Weekend Lineup, Shortlist, Stage Specs remain mockups until Phase 5.2+)
@@ -72,34 +76,70 @@ const mockSavedArtists = [
 
 export default function RestaurantDashboardPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"lineup" | "enquiries" | "shortlist" | "specs">("enquiries");
-  const [showRequirementModal, setShowRequirementModal] = useState(false);
-  const [requirementSuccess, setRequirementSuccess] = useState(false);
+  const [activeTab, setActiveTab] = useState<
+    "lineup" | "enquiries" | "gigs" | "shortlist" | "specs"
+  >("enquiries");
+  const [showGigModal, setShowGigModal] = useState(false);
+  const [editingGig, setEditingGig] = useState<BusinessPostedGig | null>(null);
+  const [gigBanner, setGigBanner] = useState<string | null>(null);
 
   // Real authenticated user state
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [enquiries, setEnquiries] = useState<BookingEnquiryWithDetails[]>([]);
   const [isLoadingEnquiries, setIsLoadingEnquiries] = useState(true);
+  const [postedGigs, setPostedGigs] = useState<BusinessPostedGig[]>([]);
+  const [isLoadingGigs, setIsLoadingGigs] = useState(true);
+  const [gigsError, setGigsError] = useState<string | null>(null);
+
+  const loadPostedGigs = useCallback(async () => {
+    setIsLoadingGigs(true);
+    const gigRes = await getBusinessPostedGigsAction();
+    if (gigRes.success && gigRes.data) {
+      setPostedGigs(gigRes.data);
+      setGigsError(null);
+    } else {
+      setGigsError(gigRes.error || "Unable to load posted gigs.");
+    }
+    setIsLoadingGigs(false);
+  }, []);
 
   useEffect(() => {
+    let active = true;
     async function init() {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         router.push("/login?redirect=/dashboard/restaurant");
         return;
       }
+      if (!active) return;
       setUserEmail(user.email || null);
 
-      // Load real enquiries
-      setIsLoadingEnquiries(true);
-      const res = await getBusinessEnquiriesAction({ status: "all", limit: 50 });
+      const [res, gigRes] = await Promise.all([
+        getBusinessEnquiriesAction({ status: "all", limit: 50 }),
+        getBusinessPostedGigsAction(),
+      ]);
+
+      if (!active) return;
       if (res.success && res.data) {
         setEnquiries(res.data);
       }
       setIsLoadingEnquiries(false);
+
+      if (gigRes.success && gigRes.data) {
+        setPostedGigs(gigRes.data);
+        setGigsError(null);
+      } else {
+        setGigsError(gigRes.error || "Unable to load posted gigs.");
+      }
+      setIsLoadingGigs(false);
     }
     init();
+    return () => {
+      active = false;
+    };
   }, [router]);
 
   // Derived real counts
@@ -110,6 +150,11 @@ export default function RestaurantDashboardPage() {
     (e) => e.status === "info_requested"
   ).length;
   const interestedCount = enquiries.filter((e) => e.status === "interested").length;
+  const openGigsCount = postedGigs.filter((g) => g.status === "open").length;
+  const totalGigApplicants = postedGigs.reduce(
+    (sum, g) => sum + (g.total_applicants || 0),
+    0
+  );
 
   return (
     <>
@@ -134,11 +179,17 @@ export default function RestaurantDashboardPage() {
             </div>
           </div>
 
-          {/* Success notice */}
-          {requirementSuccess && (
-            <div className="mb-4 p-3 rounded-xl bg-emerald-600 text-white text-xs font-semibold shadow-md flex items-center justify-between">
-              <span>✓ Live requirement posted to talent directory! (UI Demonstration)</span>
-              <button onClick={() => setRequirementSuccess(false)} className="text-white/80 hover:text-white">✕</button>
+          {/* DB-Confirmed Gig Action Success Banner */}
+          {gigBanner && (
+            <div className="mb-4 p-3.5 rounded-xl bg-emerald-600 text-white text-xs font-semibold shadow-md flex items-center justify-between gap-3">
+              <span>✓ {gigBanner}</span>
+              <button
+                type="button"
+                onClick={() => setGigBanner(null)}
+                className="text-white/80 hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
             </div>
           )}
 
@@ -157,7 +208,7 @@ export default function RestaurantDashboardPage() {
                     </span>
                   </div>
                   <p className="text-xs sm:text-sm text-gray-500">
-                    Send enquiries to artists, track responses, and manage your bookings.
+                    Publish live gigs to Artists, review applicants, send enquiries, and manage your bookings.
                   </p>
                 </div>
               </div>
@@ -170,17 +221,37 @@ export default function RestaurantDashboardPage() {
                   Browse Artists
                 </Link>
                 <button
-                  onClick={() => setShowRequirementModal(true)}
-                  className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-sm transition-colors"
+                  type="button"
+                  onClick={() => {
+                    setEditingGig(null);
+                    setShowGigModal(true);
+                  }}
+                  className="flex-1 md:flex-none px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
                 >
-                  + Post Gig Requirement
+                  + Post a Gig
                 </button>
               </div>
             </div>
           </div>
 
           {/* Quick Metrics — Live where real data exists */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+            <button
+              type="button"
+              onClick={() => setActiveTab("gigs")}
+              className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm text-left hover:border-purple-200 transition-colors cursor-pointer"
+            >
+              <span className="text-xs font-medium text-gray-500 block mb-1">Live Gigs</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl sm:text-3xl font-extrabold text-purple-700">
+                  {isLoadingGigs ? "…" : openGigsCount}
+                </span>
+                <span className="text-[11px] font-semibold text-gray-500">
+                  {isLoadingGigs ? "" : `${totalGigApplicants} applicants`}
+                </span>
+              </div>
+            </button>
+
             <button
               type="button"
               onClick={() => setActiveTab("enquiries")}
@@ -267,18 +338,23 @@ export default function RestaurantDashboardPage() {
           {/* Tabs */}
           <div className="flex items-center gap-3 border-b border-gray-200 mb-8 pb-1 overflow-x-auto">
             <button
-              onClick={() => setActiveTab("lineup")}
-              className={`pb-3 px-2 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
-                activeTab === "lineup"
+              onClick={() => setActiveTab("gigs")}
+              className={`pb-3 px-2 text-sm font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
+                activeTab === "gigs"
                   ? "border-purple-600 text-purple-600"
                   : "border-transparent text-gray-500 hover:text-gray-800"
               }`}
             >
-              Weekend Roster (3)
+              My Posted Gigs
+              {!isLoadingGigs && postedGigs.length > 0 && (
+                <span className="text-[11px] px-1.5 py-0.5 rounded-full font-bold bg-purple-100 text-purple-700">
+                  {postedGigs.length}
+                </span>
+              )}
             </button>
             <button
               onClick={() => setActiveTab("enquiries")}
-              className={`pb-3 px-2 text-sm font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-2 ${
+              className={`pb-3 px-2 text-sm font-bold border-b-2 transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer ${
                 activeTab === "enquiries"
                   ? "border-purple-600 text-purple-600"
                   : "border-transparent text-gray-500 hover:text-gray-800"
@@ -296,8 +372,18 @@ export default function RestaurantDashboardPage() {
               )}
             </button>
             <button
+              onClick={() => setActiveTab("lineup")}
+              className={`pb-3 px-2 text-sm font-bold border-b-2 transition-all whitespace-nowrap cursor-pointer ${
+                activeTab === "lineup"
+                  ? "border-purple-600 text-purple-600"
+                  : "border-transparent text-gray-500 hover:text-gray-800"
+              }`}
+            >
+              Weekend Roster (3)
+            </button>
+            <button
               onClick={() => setActiveTab("shortlist")}
-              className={`pb-3 px-2 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
+              className={`pb-3 px-2 text-sm font-bold border-b-2 transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === "shortlist"
                   ? "border-purple-600 text-purple-600"
                   : "border-transparent text-gray-500 hover:text-gray-800"
@@ -307,7 +393,7 @@ export default function RestaurantDashboardPage() {
             </button>
             <button
               onClick={() => setActiveTab("specs")}
-              className={`pb-3 px-2 text-sm font-bold border-b-2 transition-all whitespace-nowrap ${
+              className={`pb-3 px-2 text-sm font-bold border-b-2 transition-all whitespace-nowrap cursor-pointer ${
                 activeTab === "specs"
                   ? "border-purple-600 text-purple-600"
                   : "border-transparent text-gray-500 hover:text-gray-800"
@@ -316,6 +402,25 @@ export default function RestaurantDashboardPage() {
               Stage &amp; PA Specs
             </button>
           </div>
+
+          {/* TAB: My Posted Gigs — Live DB */}
+          {activeTab === "gigs" && (
+            <BusinessGigsManager
+              gigs={postedGigs}
+              isLoading={isLoadingGigs}
+              loadError={gigsError}
+              onRefresh={loadPostedGigs}
+              onOpenCreateModal={() => {
+                setEditingGig(null);
+                setShowGigModal(true);
+              }}
+              onEditGig={(gig) => {
+                setEditingGig(gig);
+                setShowGigModal(true);
+              }}
+              onStatusChanged={(msg) => setGigBanner(msg)}
+            />
+          )}
 
           {/* TAB 1: Weekend Lineup (mock — preserved as-is) */}
           {activeTab === "lineup" && (
@@ -431,63 +536,26 @@ export default function RestaurantDashboardPage() {
             </div>
           )}
 
-          {/* Requirement Posting Modal (Demo) */}
-          {showRequirementModal && (
-            <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl max-w-lg w-full p-6 sm:p-8 shadow-2xl">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-gray-900">Post a Live Entertainment Requirement</h3>
-                  <button onClick={() => setShowRequirementModal(false)} className="text-gray-400 hover:text-gray-600">✕</button>
-                </div>
-                <p className="text-xs text-gray-500 mb-4">
-                  Broadcast your need to vetted artists. This feature is coming soon.
-                </p>
-                <div className="space-y-3 text-xs">
-                  <div>
-                    <label className="font-semibold text-gray-700 block mb-1">Target Genre / Category</label>
-                    <input
-                      type="text"
-                      defaultValue="Acoustic Sufi & Bollywood Singer"
-                      className="w-full px-3 py-2 rounded-xl border border-gray-200 outline-none focus:border-purple-600"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold text-gray-700 block mb-1">Date & Slot</label>
-                    <input
-                      type="text"
-                      defaultValue="Saturday, Dec 6, 2026 (8:00 PM – 11:00 PM)"
-                      className="w-full px-3 py-2 rounded-xl border border-gray-200 outline-none focus:border-purple-600"
-                    />
-                  </div>
-                  <div>
-                    <label className="font-semibold text-gray-700 block mb-1">Budget Allocation</label>
-                    <input
-                      type="text"
-                      defaultValue="₹20,000 – ₹25,000"
-                      className="w-full px-3 py-2 rounded-xl border border-gray-200 outline-none focus:border-purple-600"
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 mt-6">
-                  <button
-                    onClick={() => {
-                      setShowRequirementModal(false);
-                      setRequirementSuccess(true);
-                      setTimeout(() => setRequirementSuccess(false), 5000);
-                    }}
-                    className="flex-1 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs transition-colors"
-                  >
-                    Publish Requirement
-                  </button>
-                  <button
-                    onClick={() => setShowRequirementModal(false)}
-                    className="px-4 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold text-xs"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
+          {/* DB-Backed Gig Create / Edit Modal */}
+          {showGigModal && (
+            <GigFormModal
+              key={editingGig?.id ?? "create"}
+              isOpen={showGigModal}
+              editingGig={editingGig}
+              onClose={() => {
+                setShowGigModal(false);
+                setEditingGig(null);
+              }}
+              onSuccess={async (gigId, mode, message) => {
+                setShowGigModal(false);
+                setEditingGig(null);
+                setGigBanner(message);
+                setActiveTab("gigs");
+                await loadPostedGigs();
+                void gigId;
+                void mode;
+              }}
+            />
           )}
 
         </div>

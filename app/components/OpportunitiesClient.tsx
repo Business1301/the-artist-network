@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import type { ArtistEligibilityState, ArtistVisibleGig } from "@/lib/gigs/types";
+import ArtistBusinessGigsBoard from "./gigs/ArtistBusinessGigsBoard";
 
 // ⚠️ SAMPLE DEMONSTRATION DATA ONLY per PROJECT_PLAN.md §5.7 & §13
 const sampleOpportunities = [
@@ -99,7 +101,24 @@ const opportunityTypes = [
   "Competitions",
 ];
 
-export default function OpportunitiesClient() {
+interface OpportunitiesClientProps {
+  initialTab?: "curated" | "business-gigs";
+  viewerState?: "unauthenticated" | "non_artist" | "artist";
+  viewerRoleLabel?: string;
+  initialBusinessGigs?: ArtistVisibleGig[];
+  initialEligibility?: ArtistEligibilityState | null;
+  initialGigsError?: string | null;
+}
+
+export default function OpportunitiesClient({
+  initialTab = "curated",
+  viewerState = "unauthenticated",
+  viewerRoleLabel,
+  initialBusinessGigs = [],
+  initialEligibility = null,
+  initialGigsError = null,
+}: OpportunitiesClientProps) {
+  const [sectionTab, setSectionTab] = useState<"curated" | "business-gigs">(initialTab);
   const [selectedType, setSelectedType] = useState("All Opportunities");
 
   const filteredList = sampleOpportunities.filter(
@@ -110,129 +129,179 @@ export default function OpportunitiesClient() {
     <main className="min-h-screen bg-gray-50 pt-24 pb-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Page Header */}
-        <div className="text-center max-w-3xl mx-auto mb-12">
+        <div className="text-center max-w-3xl mx-auto mb-8">
           <span className="inline-block text-purple-600 font-semibold text-xs sm:text-sm uppercase tracking-widest mb-2">
-            Opportunities &amp; Auditions
+            Opportunities &amp; Live Gigs
           </span>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight mb-4">
             Creative Opportunities Board
           </h1>
           <p className="text-gray-600 text-sm sm:text-base leading-relaxed">
-            Find casting calls, auditions, paid mural commissions, competitions, and artist residencies verified by organizers across India.
+            Discover casting calls and explore live private gig openings posted directly by hospitality venues and businesses for registered Artists.
           </p>
-
-          {/* Feature stage notice */}
-          <div className="inline-flex items-center gap-2 mt-4 bg-purple-50 border border-purple-200 text-purple-800 text-xs font-semibold px-4 py-2 rounded-full">
-            <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse" aria-hidden="true" />
-            Phase 6 Preview — Sample listings for visualization
-          </div>
         </div>
 
-        {/* Filter Tabs */}
-        <div className="flex flex-wrap items-center justify-center gap-2 mb-10">
-          {opportunityTypes.map((type) => (
-            <button
-              key={type}
-              onClick={() => setSelectedType(type)}
-              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                selectedType === type
-                  ? "bg-purple-600 text-white shadow-md shadow-purple-200"
-                  : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-100"
+        {/* Primary Section Switcher: Curated vs Private Business Gigs */}
+        <div className="flex flex-wrap items-center justify-center gap-3 mb-10">
+          <button
+            type="button"
+            onClick={() => setSectionTab("curated")}
+            className={`px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-bold border transition-all cursor-pointer ${
+              sectionTab === "curated"
+                ? "bg-gray-900 text-white border-gray-900 shadow-sm"
+                : "bg-white text-gray-700 border-gray-200 hover:bg-gray-100"
+            }`}
+          >
+            Auditions &amp; Commissions (Preview)
+          </button>
+          <button
+            type="button"
+            onClick={() => setSectionTab("business-gigs")}
+            className={`px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-bold border transition-all cursor-pointer flex items-center gap-2 ${
+              sectionTab === "business-gigs"
+                ? "bg-purple-600 text-white border-purple-600 shadow-md shadow-purple-200"
+                : "bg-white text-purple-700 border-purple-200 hover:bg-purple-50"
+            }`}
+          >
+            <span>🔒 Business Gigs</span>
+            <span
+              className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                sectionTab === "business-gigs"
+                  ? "bg-white/20 text-white"
+                  : "bg-purple-100 text-purple-800"
               }`}
             >
-              {type}
-            </button>
-          ))}
-        </div>
-
-        {/* Opportunities Listing Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-16">
-          {filteredList.map((opp) => (
-            <article
-              key={opp.id}
-              className="bg-white rounded-2xl border border-gray-200/90 p-6 sm:p-7 shadow-sm hover:shadow-lg hover:border-purple-200 transition-all flex flex-col"
-            >
-              {/* Meta Header */}
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <span className={`text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md border ${opp.badgeColor}`}>
-                  {opp.type}
-                </span>
-                <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                  <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Deadline: <strong className="text-gray-700">{opp.deadline}</strong>
-                </div>
-              </div>
-
-              {/* Title */}
-              <h2 className="text-lg sm:text-xl font-bold text-gray-900 leading-snug mb-2">
-                {opp.title}
-              </h2>
-
-              {/* Organizer & Category */}
-              <div className="text-xs text-gray-500 mb-4 space-y-1">
-                <p>
-                  Organized by: <strong className="text-gray-800">{opp.organizer}</strong>
-                </p>
-                <p className="flex items-center gap-1.5 text-purple-600 font-medium">
-                  <span>Target: {opp.category}</span>
-                  <span>•</span>
-                  <span>{opp.location}</span>
-                </p>
-              </div>
-
-              {/* Description */}
-              <p className="text-xs sm:text-sm text-gray-600 leading-relaxed mb-4 flex-1">
-                {opp.description}
-              </p>
-
-              {/* Key Spec Box */}
-              <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100 mb-5 space-y-2 text-xs">
-                <div className="flex items-start justify-between gap-2">
-                  <span className="text-gray-500 font-medium">Compensation:</span>
-                  <span className="font-bold text-emerald-700 text-right">{opp.compensation}</span>
-                </div>
-                <div className="flex items-start justify-between gap-2 border-t border-gray-100 pt-1.5">
-                  <span className="text-gray-500 font-medium">Dates:</span>
-                  <span className="font-semibold text-gray-800 text-right">{opp.dates}</span>
-                </div>
-                <div className="flex items-start justify-between gap-2 border-t border-gray-100 pt-1.5">
-                  <span className="text-gray-500 font-medium">Eligibility:</span>
-                  <span className="text-gray-700 text-right max-w-xs">{opp.eligibility}</span>
-                </div>
-              </div>
-
-              {/* CTA Action */}
-              <div className="flex items-center gap-3 mt-auto">
-                <button className="flex-1 py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs shadow-sm transition-colors text-center cursor-pointer">
-                  Apply for Opportunity (Demo)
-                </button>
-                <button className="py-2.5 px-4 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold text-xs transition-colors cursor-pointer">
-                  Save
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
-
-        {/* Organizer Callout Box */}
-        <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-purple-950 rounded-2xl p-8 sm:p-10 text-white text-center">
-          <h3 className="text-xl sm:text-2xl font-bold mb-2">
-            Are you an event producer, production house or venue manager?
-          </h3>
-          <p className="text-purple-200 text-sm max-w-xl mx-auto mb-6">
-            When the opportunities feature launches in Phase 6, verified organizers will be able to publish open calls, casting auditions, and artistic commissions to reach thousands of creative professionals.
-          </p>
+              Artist Only
+            </span>
+          </button>
           <Link
-            href="/#for-businesses"
-            className="inline-block px-6 py-3 bg-white text-purple-900 font-bold text-xs sm:text-sm rounded-full shadow-md hover:bg-purple-50 transition-colors"
+            href="/opportunities/business-gigs"
+            className="text-xs font-semibold text-purple-600 hover:text-purple-800 underline underline-offset-2 px-2 py-1"
           >
-            Explore Business Services
+            Open Full Business Gigs Page →
           </Link>
         </div>
+
+        {sectionTab === "business-gigs" ? (
+          <ArtistBusinessGigsBoard
+            viewerState={viewerState}
+            viewerRoleLabel={viewerRoleLabel}
+            initialGigs={initialBusinessGigs}
+            initialEligibility={initialEligibility}
+            initialLoadError={initialGigsError}
+            loginRedirectPath="/opportunities?tab=business-gigs"
+          />
+        ) : (
+          <>
+            {/* Feature stage notice */}
+            <div className="flex justify-center mb-8">
+              <div className="inline-flex items-center gap-2 bg-purple-50 border border-purple-200 text-purple-800 text-xs font-semibold px-4 py-2 rounded-full">
+                <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse" aria-hidden="true" />
+                Curated Auditions Preview — Switch to Business Gigs above for live venue postings
+              </div>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex flex-wrap items-center justify-center gap-2 mb-10">
+              {opportunityTypes.map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setSelectedType(type)}
+                  className={`px-4 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                    selectedType === type
+                      ? "bg-purple-600 text-white shadow-md shadow-purple-200"
+                      : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-100"
+                  }`}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+
+            {/* Opportunities Listing Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-16">
+              {filteredList.map((opp) => (
+                <article
+                  key={opp.id}
+                  className="bg-white rounded-2xl border border-gray-200/90 p-6 sm:p-7 shadow-sm hover:shadow-lg hover:border-purple-200 transition-all flex flex-col"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <span className={`text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md border ${opp.badgeColor}`}>
+                      {opp.type}
+                    </span>
+                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                      <svg className="w-3.5 h-3.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Deadline: <strong className="text-gray-700">{opp.deadline}</strong>
+                    </div>
+                  </div>
+
+                  <h2 className="text-lg sm:text-xl font-bold text-gray-900 leading-snug mb-2">
+                    {opp.title}
+                  </h2>
+
+                  <div className="text-xs text-gray-500 mb-4 space-y-1">
+                    <p>
+                      Organized by: <strong className="text-gray-800">{opp.organizer}</strong>
+                    </p>
+                    <p className="flex items-center gap-1.5 text-purple-600 font-medium">
+                      <span>Target: {opp.category}</span>
+                      <span>•</span>
+                      <span>{opp.location}</span>
+                    </p>
+                  </div>
+
+                  <p className="text-xs sm:text-sm text-gray-600 leading-relaxed mb-4 flex-1">
+                    {opp.description}
+                  </p>
+
+                  <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100 mb-5 space-y-2 text-xs">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-gray-500 font-medium">Compensation:</span>
+                      <span className="font-bold text-emerald-700 text-right">{opp.compensation}</span>
+                    </div>
+                    <div className="flex items-start justify-between gap-2 border-t border-gray-100 pt-1.5">
+                      <span className="text-gray-500 font-medium">Dates:</span>
+                      <span className="font-semibold text-gray-800 text-right">{opp.dates}</span>
+                    </div>
+                    <div className="flex items-start justify-between gap-2 border-t border-gray-100 pt-1.5">
+                      <span className="text-gray-500 font-medium">Eligibility:</span>
+                      <span className="text-gray-700 text-right max-w-xs">{opp.eligibility}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 mt-auto">
+                    <button
+                      type="button"
+                      onClick={() => setSectionTab("business-gigs")}
+                      className="flex-1 py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs shadow-sm transition-colors text-center cursor-pointer"
+                    >
+                      Explore Live Business Gigs →
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            {/* Organizer Callout Box */}
+            <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-purple-950 rounded-2xl p-8 sm:p-10 text-white text-center">
+              <h3 className="text-xl sm:text-2xl font-bold mb-2">
+                Are you a restaurant, lounge, hotel or event venue?
+              </h3>
+              <p className="text-purple-200 text-sm max-w-xl mx-auto mb-6">
+                Post live paid gigs directly from your Business Dashboard so registered Artists across India can apply with their portfolios and stage rates.
+              </p>
+              <Link
+                href="/dashboard/restaurant"
+                className="inline-block px-6 py-3 bg-white text-purple-900 font-bold text-xs sm:text-sm rounded-full shadow-md hover:bg-purple-50 transition-colors"
+              >
+                Post a Business Gig →
+              </Link>
+            </div>
+          </>
+        )}
       </div>
     </main>
   );
 }
-

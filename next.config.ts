@@ -79,6 +79,14 @@ const nextConfig: NextConfig = {
         source: "/signup",
         headers: noStoreHeaders,
       },
+      {
+        source: "/opportunities",
+        headers: noStoreHeaders,
+      },
+      {
+        source: "/opportunities/:path*",
+        headers: noStoreHeaders,
+      },
     ];
   },
 };
